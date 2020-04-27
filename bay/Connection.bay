@@ -1,0 +1,108 @@
+/*!
+ *  Bayrell Runtime Library
+ *
+ *  (c) Copyright 2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+namespace Runtime.ORM.MySQL;
+
+use Runtime.ORM.Connection as BaseConnection;
+use Runtime.ORM.ProviderInterface;
+use Runtime.ORM.Mysql.Cursor;
+use Runtime.ORM.Mysql.Provider;
+
+
+class Connection extends BaseConnection
+{
+	var pdo = null;
+	string last_error = "";
+	int last_code = 0;
+	
+	
+	/**
+	 * Returns true if connected
+	 */
+	bool connected()
+	{
+		return this.pdo != null;
+	}
+	
+	
+	
+	/**
+	 * Connect by provider
+	 */
+	async static Connection connect(Provider p)
+	{
+		Connection conn = new Connection();
+		
+		#switch
+		#case ifcode PHP then
+		
+		$conn->pdo = null;
+		$conn->last_error = "";
+		$conn->last_code = 0;
+		try
+		{
+			$str = 'mysql:host='.$p->host;
+			if ($p->port != null) $str .= ':'.$p->port;
+			if ($p->db != null) $str .= ';dbname='.$p->db;
+			$conn->pdo = new \PDO
+			(
+				$str, $p->username, $p->password, 
+				array
+				(
+					\PDO::ATTR_PERSISTENT => false
+				)
+			);
+			$conn->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+			$conn->pdo->exec("set names utf8");
+		}
+		catch (\PDOException $e)
+		{
+			$conn->pdo = null;
+			$conn->last_error = 'Failed connected to database!';
+			$conn->last_code = $e->getCode();
+		}
+		catch (\Excepion $e)
+		{
+			$conn->pdo = null;
+			$conn->last_error = $e->getMessage();
+			$conn->last_code = -1;
+		}
+		
+		#endswitch
+		
+		return conn;
+	}
+	
+	
+	/**
+	 * Prepares SQL and return Cursor for execute
+	 */
+	async Cursor prepare(string sql)
+	{
+		#switch
+		#case ifcode PHP then
+		
+		$st = $this->pdo->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
+		return new Cursor($st);
+		
+		#endswitch
+		
+		return null;
+	}
+	
+}

@@ -1,0 +1,94 @@
+/*!
+ *  Bayrell Runtime Library
+ *
+ *  (c) Copyright 2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+namespace Runtime.ORM.MySQL;
+
+use Runtime.Interfaces.ModuleDescriptionInterface;
+use Runtime.Annotations.Driver;
+use Runtime.Annotations.Provider;
+use Runtime.ORM.MySQL.Driver as MySQLDriver;
+use Runtime.ORM.MySQL.Provider as MySQLProvider;
+
+
+class ModuleDescription implements ModuleDescriptionInterface
+{
+	
+	
+	/**
+	 * Returns module name
+	 * @return string
+	 */
+	pure string getModuleName() => "Runtime.ORM.MySQL";
+	
+	
+	
+	/**
+	 * Returns module name
+	 * @return string
+	 */
+	pure string getModuleVersion() => "0.9.0";
+	
+	
+	
+	/**
+	 * Returns required modules
+	 * @return Map<string, string>
+	 */
+	pure Map<string> requiredModules() =>
+	{
+		'Runtime': '*',
+		
+		/* Backend */
+		#ifdef BACKEND then
+		'Runtime.ORM': '*',
+		#endif
+	};
+	
+	
+	
+	/**
+	 * Returns enities
+	 */
+	pure Collection<Dict> entities() => 
+	[
+		
+		/* Backend */
+		#ifdef BACKEND then
+		new Provider
+		{
+			"name": "Runtime.ORM.ProviderInterface",
+			"value": classof MySQLProvider,
+		},
+		
+		new Provider
+		{
+			"name": classof MySQLProvider,
+			"value": classof MySQLProvider,
+		},
+		
+		new Driver
+		{
+			"name": classof MySQLDriver,
+			"value": classof MySQLDriver,
+		}
+		#endif
+		
+	];
+	
+	
+}
