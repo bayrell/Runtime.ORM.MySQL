@@ -18,35 +18,75 @@
 
 namespace Runtime.ORM.MySQL;
 
+use Runtime.ORM.MySQL.Connection;
+
 
 class Cursor
 {
-	
+	var conn;
+	var sql;
 	var st;
 	
 	
 	/**
 	 * Constructor
 	 */
-	public void constructor(var st)
+	public void constructor(Connection conn, string sql, var st)
 	{
-		parent();
+		this.conn = conn;
+		this.sql = sql;
 		this.st = st;
 	}
 	
 	
 	
 	/**
+	 * Quote string
+	 */
+	string quote(string value)
+	{
+		#switch
+		#case ifcode PHP then
+		return $this->conn->pdo->quote($value);
+		#endswitch
+		return "";
+	}
+	
+	
+	
+	/**
+	 * Return sql
+	 */
+	string getSql(string sql, Dict args = null) =>
+		(args == null) ? "" :
+			args.reduce
+			(
+				string (string sql, string value, string key) =>
+					rs::replace(":" ~ key, this.quote(value), sql)
+				,
+				sql
+			)
+	;
+	
+	
+	
+	/**
 	 * Execute query
 	 */
-	async Cursor execute(Dict args = null)
+	async Cursor execute(Dict args = null, bool log_query = false)
 	{
+		if (log_query)
+		{
+			string sql = this.getSql(this.sql, args);
+			log(sql);
+		}
+		
 		#switch
 		#case ifcode PHP then
 		
 		if ($this->st != null)
 		{
-			$this->st->execute($args != null ? $args->_arr : []);
+			$this->st->execute($args != null ? $args->_map : []);
 		}
 		
 		#endswitch
@@ -66,8 +106,8 @@ class Cursor
 		
 		if ($this->st == null) return null;
 		
-		$row = $this->st->fetch(\PDO:FETCH_ASSOC);
-		return ($row != null) ? Dict::from($row) : $row;
+		$row = $this->st->fetch(\PDO::FETCH_ASSOC);
+		return ($row != null) ? \Runtime\Dict::from($row) : $row;
 		
 		#endswitch
 	}

@@ -22,8 +22,8 @@ use Runtime.CoreDriver;
 use Runtime.ORM.Exceptions.OrmException;
 use Runtime.ORM.Cursor;
 use Runtime.ORM.ProviderInterface;
-use Runtime.ORM.Mysql.Connection;
-use Runtime.ORM.Mysql.Provider;
+use Runtime.ORM.MySQL.Connection;
+use Runtime.ORM.MySQL.Provider;
 
 
 class Driver extends CoreDriver
@@ -70,7 +70,7 @@ class Driver extends CoreDriver
 		
 		if (not conn.connected())
 		{
-			throw OrmException(conn.last_error, conn.last_code);
+			throw new OrmException(conn.last_error, conn.last_code);
 		}
 		
 		return conn;
@@ -86,7 +86,7 @@ class Driver extends CoreDriver
 		Connection conn = this.connect(p);
 		Cursor cursor = conn
 			.prepare(sql)
-			.execute(arr)
+			.execute(arr, p.log_query)
 		;
 		return cursor;
 	}

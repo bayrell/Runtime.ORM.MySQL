@@ -33,6 +33,7 @@ struct Provider extends CoreStruct implements ProviderInterface
 	string password = "";
 	string db = "";
 	string prefix = "";
+	bool log_query = false;
 	
 	
 	/**
@@ -53,10 +54,78 @@ struct Provider extends CoreStruct implements ProviderInterface
 	 * Execute query
 	 */
 	static fn query(string sql, Dict arr) =>
-		async Cursor (Prodiver p)
+		async Cursor (Provider p) use (sql, arr)
 		{
-			Driver d = @->getDriver(classof Driver);
+			Driver d = @ -> method getDriver(classof Driver);
 			Cursor cursor = await d.query(p, sql, arr);
+			return cursor;
+		}
+	;
+	
+	
+	
+	/**
+	 * Insert query
+	 */
+	static fn insert(string table_name, Dict arr) =>
+		async void (Provider p) use (table_name, arr)
+		{
+			Vector keys = new Vector();
+			Vector values = new Vector();
+			
+			arr.each
+			(
+				void (string value, string key) use (keys, values)
+				{
+					keys.push("`" ~ key ~ "`");
+					values.push(":" ~ key);
+				}
+			);
+			
+			string sql = "insert into " ~ table_name ~
+				" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
+			;
+			
+			Cursor cursor = p -> method query(sql, arr);
+			return cursor;
+		}
+	;
+	
+	
+	
+	/**
+	 * Update query
+	 */
+	static fn update(string table_name, Dict where, Dict arr) =>
+		async void (Provider p) use (table_name, where, arr)
+		{
+			Map items = new Map();
+			Vector v_set = new Vector();
+			Vector v_where = new Vector();
+			
+			where.each
+			(
+				void (string value, string key) use (items, v_set, v_where)
+				{
+					v_where.push("`" ~ key ~ "` = :" ~ key);
+					items.set(key, value);
+				}
+			);
+			
+			arr.each
+			(
+				void (string value, string key) use (items, v_set, v_where)
+				{
+					v_set.push("`" ~ key ~ "` = :" ~ key);
+					items.set(key, value);
+				}
+			);
+			
+			string sql = "update " ~ table_name ~ " set " ~ rs::join(", ", v_set) ~
+				" where " ~ rs::join(" and ", v_where)
+			;
+			
+			Cursor cursor = p -> method query(sql, items);
 			return cursor;
 		}
 	;
