@@ -18,6 +18,7 @@
 
 namespace Runtime.ORM.MySQL;
 
+use Runtime.lib;
 use Runtime.CoreStruct;
 use Runtime.ORM.Cursor;
 use Runtime.ORM.ProviderInterface;
@@ -53,11 +54,11 @@ struct Provider extends CoreStruct implements ProviderInterface
 	/**
 	 * Execute query
 	 */
-	static fn query(string sql, Dict arr) =>
-		async Cursor (Provider p) use (sql, arr)
+	static fn query(string sql, Dict params) =>
+		async Cursor (Provider p) use (sql, params)
 		{
 			Driver d = @ -> method getDriver(classof Driver);
-			Cursor cursor = await d.query(p, sql, arr);
+			Cursor cursor = await d.query(p, sql, params);
 			return cursor;
 		}
 	;
@@ -67,13 +68,13 @@ struct Provider extends CoreStruct implements ProviderInterface
 	/**
 	 * Insert query
 	 */
-	static fn insert(string table_name, Dict arr) =>
-		async void (Provider p) use (table_name, arr)
+	static fn insert(string table_name, Dict insert) =>
+		async Cursor (Provider p) use (table_name, insert)
 		{
 			Vector keys = new Vector();
 			Vector values = new Vector();
 			
-			arr.each
+			insert.each
 			(
 				void (string value, string key) use (keys, values)
 				{
@@ -86,7 +87,7 @@ struct Provider extends CoreStruct implements ProviderInterface
 				" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
 			;
 			
-			Cursor cursor = p -> method query(sql, arr);
+			Cursor cursor = p -> method query(sql, insert);
 			return cursor;
 		}
 	;
@@ -96,8 +97,8 @@ struct Provider extends CoreStruct implements ProviderInterface
 	/**
 	 * Update query
 	 */
-	static fn update(string table_name, Dict where, Dict arr) =>
-		async void (Provider p) use (table_name, where, arr)
+	static fn update(string table_name, Dict where, Dict update) =>
+		async Cursor (Provider p) use (table_name, where, update)
 		{
 			Map items = new Map();
 			Vector v_set = new Vector();
@@ -112,7 +113,7 @@ struct Provider extends CoreStruct implements ProviderInterface
 				}
 			);
 			
-			arr.each
+			update.each
 			(
 				void (string value, string key) use (items, v_set, v_where)
 				{
@@ -127,6 +128,136 @@ struct Provider extends CoreStruct implements ProviderInterface
 			
 			Cursor cursor = p -> method query(sql, items);
 			return cursor;
+		}
+	;
+	
+	
+	
+	/**
+	 * Insert or update
+	 */
+	static fn insert_or_update(string table_name, Dict insert, Dict update) =>
+		async void (Provider p) use (table_name, insert, update)
+		{
+			Vector ins_keys = new Vector();
+			Vector ins_values = new Vector();
+			Vector where_data = new Vector();
+			Vector upd_data = new Vector();
+			Map items = new Map();
+			Map ins_items = new Map();
+			Map upd_items = new Map();
+			
+			insert.each
+			(
+				void (string value, string key) use (ins_keys, ins_values, where_data, items, ins_items)
+				{
+					ins_keys.push("`" ~ key ~ "`");
+					ins_values.push(":" ~ key);
+					where_data.push("`" ~ key ~ "` = :" ~ key);
+					items.set(key, value);
+					ins_items.set(key, value);
+				}
+			);
+			
+			update.each
+			(
+				void (string value, string key) use (ins_keys, ins_values, upd_data, items, upd_items)
+				{
+					ins_keys.push("`" ~ key ~ "`");
+					ins_values.push(":" ~ key);
+					upd_data.push("`" ~ key ~ "` = :" ~ key);
+					items.set(key, value);
+					upd_items.set(key, value);
+				}
+			);
+			
+			/* Find item */
+			Cursor c = p
+				/* -> lib::copy{ "log_query": true } */
+				-> method query
+				(
+					"select `id` from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
+					ins_items
+				)
+			;
+			Dict row = c.fetch();
+			c.close();
+			
+			/* Update */
+			if (row)
+			{
+				p 
+					/* -> lib::copy{ "log_query": true } */
+					-> method update
+					(
+						table_name,
+						ins_items,
+						upd_items
+					)
+					-> method end
+				;
+			}
+			
+			/* Insert */
+			else
+			{
+				p
+					/* -> lib::copy{ "log_query": true } */
+					-> method insert
+					(
+						table_name,
+						items
+					)
+					-> method end
+				;
+			}
+		}
+	;
+	
+	
+	
+	/**
+	 * Insert or update
+	 */
+	static fn insert_or_update_atom(string table_name, Dict insert, Dict update) =>
+		async void (Provider p) use (table_name, insert, update)
+		{
+			Vector ins_keys = new Vector();
+			Vector ins_values = new Vector();
+			Vector upd_data = new Vector();
+			Map items = new Map();
+			
+			insert.each
+			(
+				void (string value, string key) use (ins_keys, ins_values, items)
+				{
+					ins_keys.push("`" ~ key ~ "`");
+					ins_values.push(":" ~ key);
+					items.set(key, value);
+				}
+			);
+			
+			update.each
+			(
+				void (string value, string key) use (ins_keys, ins_values, upd_data, items)
+				{
+					ins_keys.push("`" ~ key ~ "`");
+					ins_values.push(":" ~ key);
+					upd_data.push("`" ~ key ~ "` = :" ~ key);
+					items.set(key, value);
+				}
+			);
+			
+			string sql = "insert into " ~ table_name ~
+				" (" ~ rs::join(", ", ins_keys) ~ ")" ~
+				" values (" ~ rs::join(", ", ins_values) ~ ")" ~
+				(
+					(upd_data.count() == 0) ? "" :
+						" ON DUPLICATE KEY UPDATE " ~ rs::join(", ", upd_data)
+				)
+			;
+			
+			Cursor cursor = p -> method query(sql, items) -> method end;
 		}
 	;
 	

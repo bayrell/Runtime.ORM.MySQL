@@ -57,9 +57,9 @@ class Cursor
 	/**
 	 * Return sql
 	 */
-	string getSql(string sql, Dict args = null) =>
-		(args == null) ? "" :
-			args.reduce
+	string getSql(string sql, Dict params = null) =>
+		(params == null) ? "" :
+			params.reduce
 			(
 				string (string sql, string value, string key) =>
 					rs::replace(":" ~ key, this.quote(value), sql)
@@ -73,11 +73,11 @@ class Cursor
 	/**
 	 * Execute query
 	 */
-	async Cursor execute(Dict args = null, bool log_query = false)
+	async Cursor execute(Dict params = null, bool log_query = false)
 	{
 		if (log_query)
 		{
-			string sql = this.getSql(this.sql, args);
+			string sql = this.getSql(this.sql, params);
 			log(sql);
 		}
 		
@@ -86,7 +86,7 @@ class Cursor
 		
 		if ($this->st != null)
 		{
-			$this->st->execute($args != null ? $args->_map : []);
+			$this->st->execute($params != null ? $params->_map : []);
 		}
 		
 		#endswitch
@@ -128,4 +128,13 @@ class Cursor
 		#endswitch
 	}
 	
+	
+	
+	/**
+	 * Close cursor
+	 */
+	static async void end(Cursor c)
+	{
+		await c.close();
+	}
 }

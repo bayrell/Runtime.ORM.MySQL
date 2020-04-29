@@ -81,12 +81,12 @@ class Driver extends CoreDriver
 	/**
 	 * Execute query and return cursor
 	 */
-	public async Cursor query(Provider p, string sql, Dict arr)
+	public async Cursor query(Provider p, string sql, Dict params)
 	{
 		Connection conn = this.connect(p);
 		Cursor cursor = conn
 			.prepare(sql)
-			.execute(arr, p.log_query)
+			.execute(params, p.log_query)
 		;
 		return cursor;
 	}
