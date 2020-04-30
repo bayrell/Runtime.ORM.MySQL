@@ -21,11 +21,11 @@ namespace Runtime.ORM.MySQL;
 use Runtime.lib;
 use Runtime.CoreStruct;
 use Runtime.ORM.Cursor;
-use Runtime.ORM.ProviderInterface;
+use Runtime.ORM.ORMProviderInterface;
 use Runtime.ORM.MySQL.Driver;
 
 
-struct Provider extends CoreStruct implements ProviderInterface
+struct Provider extends CoreStruct implements ORMProviderInterface
 {
 	
 	string host = "";
