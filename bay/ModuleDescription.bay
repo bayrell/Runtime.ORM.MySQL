@@ -71,7 +71,7 @@ class ModuleDescription implements ModuleDescriptionInterface
 		#ifdef BACKEND then
 		new Provider
 		{
-			"name": "Runtime.ORM.ProviderInterface",
+			"name": "Runtime.ORM.ORMProviderInterface",
 			"value": classof MySQLProvider,
 		},
 		

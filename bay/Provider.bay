@@ -54,7 +54,7 @@ struct Provider extends CoreStruct implements ProviderInterface
 	/**
 	 * Execute query
 	 */
-	static fn query(string sql, Dict params) =>
+	static fn query(string sql, Dict params = null) =>
 		async Cursor (Provider p) use (sql, params)
 		{
 			Driver d = @ -> method getDriver(classof Driver);
