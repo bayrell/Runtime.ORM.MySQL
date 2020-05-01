@@ -99,17 +99,46 @@ class Cursor
 	/**
 	 * Fetch next row
 	 */
-	async Dict fetch()
+	async Dict fetch(fn f = null)
 	{
+		Dict row = null;
+		
 		#switch
 		#case ifcode PHP then
 		
 		if ($this->st == null) return null;
 		
 		$row = $this->st->fetch(\PDO::FETCH_ASSOC);
-		return ($row != null) ? \Runtime\Dict::from($row) : $row;
+		$row = ($row != null) ? \Runtime\Dict::from($row) : null;
 		
 		#endswitch
+		
+		if (row and f) row = f(row);
+		return row;
+	}
+	
+	
+	
+	/**
+	 * Fetch all rows
+	 */
+	async Dict fetchAll(fn f = null)
+	{
+		Vector<Dict> items = new Vector();
+		while (true)
+		{
+			Dict row = await this.fetch();
+			if (row == null)
+			{
+				break;
+			}
+			if (f)
+			{
+				row = f(row);
+			}
+			items.push(row);
+		}
+		return items.toCollection();
 	}
 	
 	
