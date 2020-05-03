@@ -120,6 +120,18 @@ class Cursor
 	
 	
 	/**
+	 * Fetch one
+	 */
+	async Dict fetchOne(fn f = null)
+	{
+		Dict row = await this.fetch();
+		if (row and f) row = f(row);
+		return row;
+	}
+	
+	
+	
+	/**
 	 * Fetch all rows
 	 */
 	async Dict fetchAll(fn f = null)
@@ -138,6 +150,7 @@ class Cursor
 			}
 			items.push(row);
 		}
+		
 		return items.toCollection();
 	}
 	
@@ -155,6 +168,30 @@ class Cursor
 		$this->st = null;
 		
 		#endswitch
+	}
+	
+	
+	
+	/**
+	 * Get one
+	 */
+	static async void getOne(Cursor c)
+	{
+		Dict row = await c.fetchOne();
+		await c.close();
+		return row;
+	}
+	
+	
+	
+	/**
+	 * Get all
+	 */
+	static async void getAll(Cursor c)
+	{
+		Collection<Dict> items = await c.fetchAll();
+		await c.close();
+		return items;
 	}
 	
 	
