@@ -23,9 +23,9 @@ use Runtime.ORM.MySQL.Connection;
 
 class Cursor
 {
-	var conn;
-	var sql;
-	var st;
+	protected var conn;
+	protected var sql;
+	protected var st;
 	
 	
 	/**
@@ -57,14 +57,14 @@ class Cursor
 	/**
 	 * Return sql
 	 */
-	string getSql(string sql, Dict params = null) =>
+	string getSql(Dict params = null) =>
 		(params == null) ? "" :
 			params.reduce
 			(
 				string (string sql, string value, string key) =>
 					rs::replace(":" ~ key, this.quote(value), sql)
 				,
-				sql
+				this.sql
 			)
 	;
 	
@@ -77,7 +77,7 @@ class Cursor
 	{
 		if (log_query)
 		{
-			string sql = this.getSql(this.sql, params);
+			string sql = this.getSql(params);
 			log(sql);
 		}
 		
