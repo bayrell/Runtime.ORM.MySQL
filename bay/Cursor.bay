@@ -58,7 +58,7 @@ class Cursor
 	 * Return sql
 	 */
 	string getSql(Dict params = null) =>
-		(params == null) ? "" :
+		(params == null) ? this.sql :
 			params.reduce
 			(
 				string (string sql, string value, string key) =>
