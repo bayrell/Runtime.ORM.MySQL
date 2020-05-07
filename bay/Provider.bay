@@ -88,6 +88,7 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			;
 			
 			Cursor cursor = p -> method query(sql, insert);
+			cursor.setKind("insert");
 			return cursor;
 		}
 	;
@@ -127,6 +128,7 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			;
 			
 			Cursor cursor = p -> method query(sql, items);
+			cursor.setKind("update");
 			return cursor;
 		}
 	;
@@ -173,7 +175,6 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			
 			/* Find item */
 			Cursor c = p
-				/* -> lib::copy{ "log_query": true } */
 				-> method query
 				(
 					"select `id` from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
@@ -187,13 +188,7 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			if (row)
 			{
 				p 
-					/* -> lib::copy{ "log_query": true } */
-					-> method update
-					(
-						table_name,
-						ins_items,
-						upd_items
-					)
+					-> method update(table_name, ins_items, upd_items)
 					-> method end
 				;
 			}
@@ -202,12 +197,7 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			else
 			{
 				p
-					/* -> lib::copy{ "log_query": true } */
-					-> method insert
-					(
-						table_name,
-						items
-					)
+					-> method insert(table_name, items)
 					-> method end
 				;
 			}

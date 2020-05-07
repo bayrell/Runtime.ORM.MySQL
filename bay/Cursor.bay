@@ -23,19 +23,42 @@ use Runtime.ORM.MySQL.Connection;
 
 class Cursor
 {
+	protected var pdo;
 	protected var conn;
 	protected var sql;
 	protected var st;
+	protected var kind;
 	
 	
 	/**
 	 * Constructor
 	 */
-	public void constructor(Connection conn, string sql, var st)
+	public void constructor(Connection conn, string sql, var pdo, var st)
 	{
 		this.conn = conn;
 		this.sql = sql;
+		this.pdo = pdo;
 		this.st = st;
+	}
+	
+	
+	
+	/**
+	 * Set kind
+	 */
+	public void setKind(string kind)
+	{
+		this.kind = kind;
+	}
+	
+	
+	
+	/**
+	 * Get kind
+	 */
+	public void getKind()
+	{
+		return this.kind;
 	}
 	
 	
@@ -199,8 +222,25 @@ class Cursor
 	/**
 	 * Close cursor
 	 */
-	static async void end(Cursor c)
+	static async var end(Cursor c)
 	{
+		var res = null;
+		string kind = c.getKind();
+		if (kind == "insert")
+		{
+			#switch
+			#case ifcode PHP then
+			$res = $c->pdo->lastInsertId();
+			#endswitch
+		}
+		else if (kind == "update")
+		{
+			#switch
+			#case ifcode PHP then
+			$res = $c->st->rowCount();
+			#endswitch
+		}
 		await c.close();
+		return res;
 	}
 }
