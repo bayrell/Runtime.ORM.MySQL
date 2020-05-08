@@ -109,7 +109,14 @@ class Cursor
 		
 		if ($this->st != null)
 		{
-			$this->st->execute($params != null ? $params->_map : []);
+			try
+			{
+				$this->st->execute($params != null ? $params->_map : []);
+			}
+			catch (\PDOException $e)
+			{
+				throw new \Runtime\ORM\Exceptions\ORMException($ctx, $e->getMessage(), $e->getCode());
+			}
 		}
 		
 		#endswitch
