@@ -99,7 +99,7 @@ class Connection extends BaseConnection
 		#case ifcode PHP then
 		
 		$st = $this->pdo->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
-		return new Cursor($ctx, $this, $sql, $this->pdo, $st);
+		return new Cursor($ctx, $this, $sql, $st);
 		
 		#endswitch
 		

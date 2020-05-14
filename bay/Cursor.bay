@@ -33,11 +33,11 @@ class Cursor
 	/**
 	 * Constructor
 	 */
-	public void constructor(Connection conn, string sql, var pdo, var st)
+	public void constructor(Connection conn, string sql, var st)
 	{
 		this.conn = conn;
 		this.sql = sql;
-		this.pdo = pdo;
+		this.pdo = this.conn.pdo;
 		this.st = st;
 	}
 	
@@ -205,7 +205,7 @@ class Cursor
 	/**
 	 * Get one
 	 */
-	static async void getOne(Cursor c)
+	static async Dict getOne(Cursor c)
 	{
 		Dict row = await c.fetchOne();
 		await c.close();
@@ -217,11 +217,47 @@ class Cursor
 	/**
 	 * Get all
 	 */
-	static async void getAll(Cursor c)
+	static async Collection<Dict> getAll(Cursor c)
 	{
 		Collection<Dict> items = await c.fetchAll();
 		await c.close();
 		return items;
+	}
+	
+	
+	
+	/**
+	 * Returns last insert id
+	 */
+	static async var lastInsertId(Cursor c)
+	{
+		string kind = c.getKind();
+		if (kind != "insert") return null;
+		
+		#switch
+		#case ifcode PHP then
+		return $c->pdo->lastInsertId();
+		#endswitch
+		
+		return null;
+	}
+	
+	
+	
+	/**
+	 * Returns row count
+	 */
+	static async var rowCount(Cursor c)
+	{
+		string kind = c.getKind();
+		if (kind != "update") return null;
+		
+		#switch
+		#case ifcode PHP then
+		return $c->st->rowCount();
+		#endswitch
+		
+		return null;
 	}
 	
 	

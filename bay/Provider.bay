@@ -20,8 +20,10 @@ namespace Runtime.ORM.MySQL;
 
 use Runtime.lib;
 use Runtime.CoreStruct;
+use Runtime.ORM.Connection;
 use Runtime.ORM.Cursor;
 use Runtime.ORM.ORMProviderInterface;
+use Runtime.ORM.QueryBuilder;
 use Runtime.ORM.MySQL.Driver;
 
 
@@ -35,6 +37,7 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 	string db = "";
 	string prefix = "";
 	bool log_query = false;
+	
 	
 	
 	/**
@@ -54,11 +57,85 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 	/**
 	 * Execute query
 	 */
+	static fn execute(QueryBuilder q) =>
+		async Cursor (Provider p) use (q)
+		{
+			fn escape = string (string item) => static::escape(item);
+			
+			/* Select query */
+			if (q._kind == QueryBuilder::QUERY_SELECT)
+			{
+				string sql = "SELECT ";
+				Map params = new Map();
+				
+				/* Add fields */
+				if (q._fields != null) sql ~= rs::join(", ", q._fields);
+				
+				/* Add table name */
+				string table_name = q._table_name;
+				sql ~= " FROM " ~ escape(table_name);
+				
+				/* Add table alias */
+				if (q._table_name_alias != "") sql ~= " AS " ~ q._table_name_alias;
+				
+				/* Add where */
+				if (q._where != null)
+				{
+					Vector<string> where = new Vector();
+					q._where.each
+					(
+						void (var value, string key) use (where, params, escape)
+						{
+							where.push(escape(key) ~ " = :" ~ key);
+							params.set(key, value);
+						}
+					);
+					string where_str = rs::join(" AND ", where);
+					if (where_str != "") sql ~= " WHERE " ~ where_str;
+				}
+				
+				/* Add order */
+				if (q._order != null)
+				{
+					Collection order = q._order.map
+					(
+						string (Collection order) => order[0] ~ " " ~ order[1]
+					);
+					
+					string order_str = rs::join(", ", order);
+					if (order_str != "") sql ~= " ORDER BY " ~ order_str;
+				}
+				
+				/* Add order */
+				if (q._limit >= 0) sql ~= " LIMIT " ~ q._limit;
+				if (q._start >= 0) sql ~= " OFFSET " ~ q._start;
+				
+				Cursor cursor = p -> await method query(sql, params.toDict());
+				return cursor;
+			}
+			
+			return null;
+		}
+	;
+	
+	
+	
+	/**
+	 * Execute query
+	 */
 	static fn query(string sql, Dict params = null) =>
 		async Cursor (Provider p) use (sql, params)
 		{
 			Driver d = @ -> method getDriver(classof Driver);
-			Cursor cursor = await d.query(p, sql, params);
+			
+			/* Connect */
+			Connection conn = await d.connect(p);
+			
+			/* Execute */
+			Cursor cursor = await conn.prepare(sql);
+			await cursor.execute(params, p.log_query);
+			
+			/* Return cursor */
 			return cursor;
 		}
 	;
@@ -109,8 +186,8 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			(
 				void (string value, string key) use (items, v_set, v_where)
 				{
-					v_where.push("`" ~ key ~ "` = :" ~ key);
-					items.set(key, value);
+					v_where.push("`" ~ key ~ "` = :where_" ~ key);
+					items.set("where_" ~ key, value);
 				}
 			);
 			
@@ -118,8 +195,8 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			(
 				void (string value, string key) use (items, v_set, v_where)
 				{
-					v_set.push("`" ~ key ~ "` = :" ~ key);
-					items.set(key, value);
+					v_set.push("`" ~ key ~ "` = :update_" ~ key);
+					items.set("update_" ~ key, value);
 				}
 			);
 			
@@ -250,5 +327,12 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			Cursor cursor = p -> method query(sql, items) -> method end;
 		}
 	;
+	
+	
+	
+	/**
+	 * Escape
+	 */
+	pure string escape(string item) => "`" ~ item ~ "`";
 	
 }

@@ -29,7 +29,7 @@ use Runtime.ORM.MySQL.Provider;
 class Driver extends CoreDriver
 {
 	
-	protected Map providers;
+	protected Map connections;
 	
 	
 	/**
@@ -38,7 +38,7 @@ class Driver extends CoreDriver
 	public void constructor()
 	{
 		parent();
-		this.providers = new Map();
+		this.connections = new Map();
 	}
 	
 	
@@ -59,14 +59,14 @@ class Driver extends CoreDriver
 	{
 		string hash = p::getHash(p);
 		
-		if (this.providers.has(hash))
+		if (this.connections.has(hash))
 		{
-			Connection conn = this.providers.item(hash);
+			Connection conn = this.connections.item(hash);
 			return conn;
 		}
 		
 		Connection conn = await Connection::connect(p);
-		this.providers.set(hash, conn);
+		this.connections.set(hash, conn);
 		
 		if (not conn.connected())
 		{
@@ -74,21 +74,6 @@ class Driver extends CoreDriver
 		}
 		
 		return conn;
-	}
-	
-	
-	
-	/**
-	 * Execute query and return cursor
-	 */
-	public async Cursor query(Provider p, string sql, Dict params)
-	{
-		Connection conn = this.connect(p);
-		Cursor cursor = conn
-			.prepare(sql)
-			.execute(params, p.log_query)
-		;
-		return cursor;
 	}
 	
 }
