@@ -254,7 +254,7 @@ struct Provider extends CoreStruct implements ORMProviderInterface
 			Cursor c = p
 				-> method query
 				(
-					"select `id` from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
+					"select * from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
 					ins_items
 				)
 			;
