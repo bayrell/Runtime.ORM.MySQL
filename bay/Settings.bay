@@ -18,45 +18,28 @@
 
 namespace Runtime.ORM.MySQL;
 
-use Runtime.Interfaces.ModuleDescriptionInterface;
+use Runtime.BaseStruct;
 
 
-class ModuleDescription implements ModuleDescriptionInterface
+struct Settings extends BaseStruct
 {
-	
-	/**
-	 * Returns module name
-	 * @return string
-	 */
-	pure string getModuleName() => "Runtime.ORM.MySQL";
-	
-	
-	
-	/**
-	 * Returns module name
-	 * @return string
-	 */
-	pure string getModuleVersion() => "0.10.0";
-	
+	string host = "";
+	int port = 3306;
+	string username = "";
+	string password = "";
+	string db = "";
+	string prefix = "";
 	
 	
 	/**
-	 * Returns required modules
-	 * @return Map<string, string>
+	 * Returns providers hash
 	 */
-	pure Map<string> requiredModules() =>
-	{
-		'Runtime': '*',
-		'Runtime.ORM': '*',
-	};
-	
-	
-	
-	/**
-	 * Returns enities
-	 */
-	pure Collection<Dict> entities() => 
-	[
-	];
-	
+	string getHash() =>
+		this.hostname ~ "|" ~
+		this.port ~ "|" ~
+		this.username ~ "|" ~
+		this.password ~ "|" ~
+		this.db ~ "|" ~
+		this.prefix
+	;
 }

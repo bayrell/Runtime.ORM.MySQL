@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@ namespace Runtime.ORM.MySQL;
 use Runtime.ORM.Connection as BaseConnection;
 use Runtime.ORM.ProviderInterface;
 use Runtime.ORM.MySQL.Cursor;
-use Runtime.ORM.MySQL.Provider;
+use Runtime.ORM.MySQL.Settings;
 
 
-class Connection extends BaseConnection
+class Connection
 {
 	var pdo = null;
 	string last_error = "";
@@ -44,7 +44,7 @@ class Connection extends BaseConnection
 	/**
 	 * Connect by provider
 	 */
-	async static Connection connect(Provider p)
+	async static Connection connect(Settings settings)
 	{
 		Connection conn = new Connection();
 		
@@ -56,12 +56,12 @@ class Connection extends BaseConnection
 		$conn->last_code = 0;
 		try
 		{
-			$str = 'mysql:host='.$p->host;
-			if ($p->port != null) $str .= ':'.$p->port;
-			if ($p->db != null) $str .= ';dbname='.$p->db;
+			$str = 'mysql:host='.$settings->host;
+			if ($settings->port != null) $str .= ':'.$settings->port;
+			if ($settings->db != null) $str .= ';dbname='.$settings->db;
 			$conn->pdo = new \PDO
 			(
-				$str, $p->username, $p->password, 
+				$str, $settings->username, $settings->password, 
 				array
 				(
 					\PDO::ATTR_PERSISTENT => false

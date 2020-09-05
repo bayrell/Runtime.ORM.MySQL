@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,18 +18,18 @@
 
 namespace Runtime.ORM.MySQL;
 
-use Runtime.CoreDriver;
+use Runtime.Core.CoreDriver;
 use Runtime.ORM.Exceptions.OrmException;
-use Runtime.ORM.Cursor;
-use Runtime.ORM.ProviderInterface;
+use Runtime.ORM.DriverInterface;
+use Runtime.ORM.QueryBuilder;
 use Runtime.ORM.MySQL.Connection;
-use Runtime.ORM.MySQL.Provider;
+use Runtime.ORM.MySQL.Cursor;
+use Runtime.ORM.MySQL.Settings;
 
 
-class Driver extends CoreDriver
+class Driver extends CoreDriver implements DriverInterface
 {
-	
-	protected Map connections;
+	protected Map<Connection> connections;
 	
 	
 	/**
@@ -53,20 +53,26 @@ class Driver extends CoreDriver
 	
 	
 	/**
+	 * Escape
+	 */
+	pure string escape(string item) => "`" ~ item ~ "`";
+	
+	
+	
+	/**
 	 * Connect to mysql
 	 */
-	public async var connect(Provider p)
+	public async Connection connect(string connection_name)
 	{
-		string hash = p::getHash(p);
-		
-		if (this.connections.has(hash))
+		if (this.connections.has(connection_name))
 		{
-			Connection conn = this.connections.item(hash);
+			Connection conn = this.connections.item(connection_name);
 			return conn;
 		}
 		
-		Connection conn = await Connection::connect(p);
-		this.connections.set(hash, conn);
+		Settings settings = @.config(["Runtime.ORM.MySQL", connection_name], null);
+		Connection conn = await Connection::connect(settings);
+		this.connections.set(connection_name, conn);
 		
 		if (not conn.connected())
 		{
@@ -74,6 +80,366 @@ class Driver extends CoreDriver
 		}
 		
 		return conn;
+	}
+	
+	
+	
+	/**
+	 * Execute query
+	 */
+	public async Cursor query
+	(
+		string sql,
+		Dict params = null,
+		string connection_name = "default",
+		bool log_query = false
+	)
+	{
+		Connection conn = this.connect(connection_name);
+		
+		/* Execute */
+		Cursor cursor = await conn.prepare(sql);
+		await cursor.execute(params, log_query);
+		
+		/* Return cursor */
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Select query
+	 */
+	public async Cursor select
+	(
+		string table_name,
+		Dict where = null,
+		int start, int limit,
+		string connection_name = "default",
+		bool log_query = false
+	)
+	{
+		start = rtl::toInt(start);
+		limit = rtl::toInt(limit);
+		
+		Map items = new Map();
+		Vector v_where = new Vector();
+		where.each
+		(
+			void (string value, string key) use (items, v_where)
+			{
+				v_where.push("`" ~ key ~ "` = :where_" ~ key);
+				items.set("where_" ~ key, value);
+			}
+		);
+		
+		string sql = "select * from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
+		if (limit >= 0) sql ~= " limit " ~ limit;
+		if (start >= 0) sql ~= " offset " ~ start;
+		
+		Cursor cursor = await this.query(sql, items, connection_name, log_query);
+		cursor.setKind("select");
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Insert query
+	 */
+	public async Cursor insert
+	(
+		string table_name,
+		Dict insert,
+		string connection_name = "default",
+		bool log_query = false
+	)
+	{
+		Vector keys = new Vector();
+		Vector values = new Vector();
+		
+		insert.each
+		(
+			void (string value, string key) use (keys, values)
+			{
+				keys.push("`" ~ key ~ "`");
+				values.push(":" ~ key);
+			}
+		);
+		
+		string sql = "insert into " ~ table_name ~
+			" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
+		;
+		
+		Cursor cursor = await this.query(sql, insert, connection_name, log_query);
+		cursor.setKind("insert");
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Update query
+	 */
+	public async Cursor update
+	(
+		string table_name,
+		Dict where,
+		Dict update,
+		string connection_name = "default",
+		bool log_query = false
+	)
+	{
+		Map items = new Map();
+		Vector v_set = new Vector();
+		Vector v_where = new Vector();
+		
+		where.each
+		(
+			void (string value, string key) use (items, v_set, v_where)
+			{
+				v_where.push("`" ~ key ~ "` = :where_" ~ key);
+				items.set("where_" ~ key, value);
+			}
+		);
+		
+		update.each
+		(
+			void (string value, string key) use (items, v_set, v_where)
+			{
+				v_set.push("`" ~ key ~ "` = :update_" ~ key);
+				items.set("update_" ~ key, value);
+			}
+		);
+		
+		string sql = "update " ~ table_name ~ " set " ~ rs::join(", ", v_set) ~
+			" where " ~ rs::join(" and ", v_where)
+		;
+		
+		Cursor cursor = await this.query(sql, items, connection_name, log_query);
+		cursor.setKind("update");
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Insert or update
+	 */
+	public async void insert_or_update
+	(
+		string table_name,
+		Dict insert,
+		Dict update,
+		string connection_name = "default",
+		bool log_query = false
+	)
+	{
+		Cursor c = null;
+		Vector ins_keys = new Vector();
+		Vector ins_values = new Vector();
+		Vector where_data = new Vector();
+		Vector upd_data = new Vector();
+		Map items = new Map();
+		Map ins_items = new Map();
+		Map upd_items = new Map();
+		
+		insert.each
+		(
+			void (string value, string key) use (ins_keys, ins_values, where_data, items, ins_items)
+			{
+				ins_keys.push("`" ~ key ~ "`");
+				ins_values.push(":" ~ key);
+				where_data.push("`" ~ key ~ "` = :" ~ key);
+				items.set(key, value);
+				ins_items.set(key, value);
+			}
+		);
+		
+		update.each
+		(
+			void (string value, string key) use (ins_keys, ins_values, upd_data, items, upd_items)
+			{
+				ins_keys.push("`" ~ key ~ "`");
+				ins_values.push(":" ~ key);
+				upd_data.push("`" ~ key ~ "` = :" ~ key);
+				items.set(key, value);
+				upd_items.set(key, value);
+			}
+		);
+		
+		/* Find item */
+		c = this.query
+		(
+			"select * from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
+			ins_items,
+			connection_name,
+			log_query
+		)
+		;
+		Dict row = c.fetch();
+		c.close();
+		
+		/* Update */
+		if (row)
+		{
+			c = await this.update(table_name, ins_items, upd_items, connection_name, log_query);
+			c.close();
+		}
+		
+		/* Insert */
+		else
+		{
+			c = await this.insert(table_name, items, connection_name, log_query);
+			c.close();
+		}
+	}
+	
+	
+	
+	/**
+	 * Insert or update
+	 */
+	public async void insert_or_update_atom
+	(
+		string table_name,
+		Dict insert,
+		Dict update,
+		string connection_name = "default",
+		bool log_query = false
+	)
+	{
+		Vector ins_keys = new Vector();
+		Vector ins_values = new Vector();
+		Vector upd_data = new Vector();
+		Map items = new Map();
+		
+		insert.each
+		(
+			void (string value, string key) use (ins_keys, ins_values, items)
+			{
+				ins_keys.push("`" ~ key ~ "`");
+				ins_values.push(":" ~ key);
+				items.set(key, value);
+			}
+		);
+		
+		update.each
+		(
+			void (string value, string key) use (ins_keys, ins_values, upd_data, items)
+			{
+				ins_keys.push("`" ~ key ~ "`");
+				ins_values.push(":" ~ key);
+				upd_data.push("`" ~ key ~ "` = :" ~ key);
+				items.set(key, value);
+			}
+		);
+		
+		string sql = "insert into " ~ table_name ~
+			" (" ~ rs::join(", ", ins_keys) ~ ")" ~
+			" values (" ~ rs::join(", ", ins_values) ~ ")" ~
+			(
+				(upd_data.count() == 0) ? "" :
+					" ON DUPLICATE KEY UPDATE " ~ rs::join(", ", upd_data)
+			)
+		;
+		
+		Cursor c = await this.query(sql, items, connection_name, log_query);
+		c.close();
+	}
+	
+	
+	
+	/**
+	 * Delete query
+	 */
+	public async Cursor delete
+	(
+		string table_name,
+		Dict where = null,
+		string connection_name = "default",
+		bool log_query = false
+	)
+	{
+		Map items = new Map();
+		Vector v_where = new Vector();
+		where.each
+		(
+			void (string value, string key) use (items, v_where)
+			{
+				v_where.push("`" ~ key ~ "` = :where_" ~ key);
+				items.set("where_" ~ key, value);
+			}
+		);
+		
+		string sql = "delete from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
+		Cursor cursor = await this.query(sql, items, connection_name, log_query);
+		cursor.setKind("delete");
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Execute query
+	 */
+	Cursor execute(QueryBuilder q, string connection_name = "default", bool log_query = false)
+	{
+		fn escape = string (string item) => static::escape(item);
+		
+		/* Select query */
+		if (q._kind == QueryBuilder::QUERY_SELECT)
+		{
+			string sql = "SELECT ";
+			Map params = new Map();
+			
+			/* Add fields */
+			if (q._fields != null) sql ~= rs::join(", ", q._fields);
+			
+			/* Add table name */
+			string table_name = q._table_name;
+			sql ~= " FROM " ~ escape(table_name);
+			
+			/* Add table alias */
+			if (q._table_name_alias != "") sql ~= " AS " ~ q._table_name_alias;
+			
+			/* Add where */
+			if (q._where != null)
+			{
+				Vector<string> where = new Vector();
+				q._where.each
+				(
+					void (var value, string key) use (where, params, escape)
+					{
+						where.push(escape(key) ~ " = :" ~ key);
+						params.set(key, value);
+					}
+				);
+				string where_str = rs::join(" AND ", where);
+				if (where_str != "") sql ~= " WHERE " ~ where_str;
+			}
+			
+			/* Add order */
+			if (q._order != null)
+			{
+				Collection order = q._order.map
+				(
+					string (Collection order) => order[0] ~ " " ~ order[1]
+				);
+				
+				string order_str = rs::join(", ", order);
+				if (order_str != "") sql ~= " ORDER BY " ~ order_str;
+			}
+			
+			/* Add order */
+			if (q._limit >= 0) sql ~= " LIMIT " ~ q._limit;
+			if (q._start >= 0) sql ~= " OFFSET " ~ q._start;
+			
+			Cursor cursor = await this.query(sql, params.toDict(), connection_name, log_query);
+			return cursor;
+		}
+		
+		return null;
 	}
 	
 }

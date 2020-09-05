@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,10 +18,11 @@
 
 namespace Runtime.ORM.MySQL;
 
+use Runtime.ORM.CursorInterface;
 use Runtime.ORM.MySQL.Connection;
 
 
-class Cursor
+class Cursor implements CursorInterface
 {
 	protected var pdo;
 	protected var conn;
@@ -205,10 +206,9 @@ class Cursor
 	/**
 	 * Get one
 	 */
-	static async Dict getOne(Cursor c)
+	async Dict getOne()
 	{
-		Dict row = await c.fetchOne();
-		await c.close();
+		Dict row = await this.fetchOne();
 		return row;
 	}
 	
@@ -217,10 +217,9 @@ class Cursor
 	/**
 	 * Get all
 	 */
-	static async Collection<Dict> getAll(Cursor c)
+	async Collection<Dict> getAll(Cursor c)
 	{
-		Collection<Dict> items = await c.fetchAll();
-		await c.close();
+		Collection<Dict> items = await this.fetchAll();
 		return items;
 	}
 	
@@ -229,14 +228,14 @@ class Cursor
 	/**
 	 * Returns last insert id
 	 */
-	static async var lastInsertId(Cursor c)
+	async var lastInsertId()
 	{
-		string kind = c.getKind();
+		string kind = this.getKind();
 		if (kind != "insert") return null;
 		
 		#switch
 		#case ifcode PHP then
-		return $c->pdo->lastInsertId();
+		return $this->pdo->lastInsertId();
 		#endswitch
 		
 		return null;
@@ -247,43 +246,17 @@ class Cursor
 	/**
 	 * Returns row count
 	 */
-	static async var rowCount(Cursor c)
+	async var rowCount(Cursor c)
 	{
-		string kind = c.getKind();
+		string kind = this.getKind();
 		if (kind != "update") return null;
 		
 		#switch
 		#case ifcode PHP then
-		return $c->st->rowCount();
+		return $this->st->rowCount();
 		#endswitch
 		
 		return null;
 	}
 	
-	
-	
-	/**
-	 * Close cursor
-	 */
-	static async var end(Cursor c)
-	{
-		var res = null;
-		string kind = c.getKind();
-		if (kind == "insert")
-		{
-			#switch
-			#case ifcode PHP then
-			$res = $c->pdo->lastInsertId();
-			#endswitch
-		}
-		else if (kind == "update")
-		{
-			#switch
-			#case ifcode PHP then
-			$res = $c->st->rowCount();
-			#endswitch
-		}
-		await c.close();
-		return res;
-	}
 }
