@@ -269,7 +269,7 @@ class Driver extends CoreDriver implements DriverInterface
 		);
 		
 		/* Find item */
-		c = this.query
+		c = await this.query
 		(
 			"select * from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
 			ins_items,
@@ -277,21 +277,21 @@ class Driver extends CoreDriver implements DriverInterface
 			log_query
 		)
 		;
-		Dict row = c.fetch();
-		c.close();
+		Dict row = await c.fetch();
+		await c.close();
 		
 		/* Update */
 		if (row)
 		{
 			c = await this.update(table_name, ins_items, upd_items, connection_name, log_query);
-			c.close();
+			await c.close();
 		}
 		
 		/* Insert */
 		else
 		{
 			c = await this.insert(table_name, items, connection_name, log_query);
-			c.close();
+			await c.close();
 		}
 	}
 	

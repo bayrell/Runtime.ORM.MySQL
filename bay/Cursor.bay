@@ -116,7 +116,7 @@ class Cursor implements CursorInterface
 			}
 			catch (\PDOException $e)
 			{
-				throw new \Runtime\ORM\Exceptions\ORMException($ctx, $e->getMessage(), $e->getCode());
+				throw new \Runtime\ORM\Exceptions\OrmException($ctx, $e->getMessage(), $e->getCode());
 			}
 		}
 		
