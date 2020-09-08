@@ -230,9 +230,6 @@ class Cursor implements CursorInterface
 	 */
 	async var lastInsertId()
 	{
-		string kind = this.getKind();
-		if (kind != "insert") return null;
-		
 		#switch
 		#case ifcode PHP then
 		return $this->pdo->lastInsertId();
@@ -246,11 +243,8 @@ class Cursor implements CursorInterface
 	/**
 	 * Returns row count
 	 */
-	async var rowCount(Cursor c)
+	async var rowCount()
 	{
-		string kind = this.getKind();
-		if (kind != "update") return null;
-		
 		#switch
 		#case ifcode PHP then
 		return $this->st->rowCount();
@@ -259,4 +253,18 @@ class Cursor implements CursorInterface
 		return null;
 	}
 	
+	
+	
+	/**
+	 * Returns found rows
+	 */
+	async var foundRows()
+	{
+		#switch
+		#case ifcode PHP then
+		return $this->pdo->query('SELECT FOUND_ROWS()')->fetchColumn();
+		#endswitch
+		
+		return null;
+	}
 }
