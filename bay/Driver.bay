@@ -91,10 +91,11 @@ class Driver extends CoreDriver implements DriverInterface
 	(
 		string sql,
 		Dict params = null,
-		string connection_name = "default",
-		bool log_query = false
+		Dict settings = null
 	)
 	{
+		string connection_name = settings["connection"] |> default string "default";
+		string log_query = settings["debug"] |> default bool false;
 		Connection conn = this.connect(connection_name);
 		
 		/* Execute */
@@ -115,8 +116,7 @@ class Driver extends CoreDriver implements DriverInterface
 		string table_name,
 		Dict where = null,
 		int start, int limit,
-		string connection_name = "default",
-		bool log_query = false
+		Dict settings = null
 	)
 	{
 		start = rtl::toInt(start);
@@ -137,7 +137,7 @@ class Driver extends CoreDriver implements DriverInterface
 		if (limit >= 0) sql ~= " limit " ~ limit;
 		if (start >= 0) sql ~= " offset " ~ start;
 		
-		Cursor cursor = await this.query(sql, items, connection_name, log_query);
+		Cursor cursor = await this.query(sql, items, settings);
 		cursor.setKind("select");
 		return cursor;
 	}
@@ -151,8 +151,7 @@ class Driver extends CoreDriver implements DriverInterface
 	(
 		string table_name,
 		Dict insert,
-		string connection_name = "default",
-		bool log_query = false
+		Dict settings = null
 	)
 	{
 		Vector keys = new Vector();
@@ -171,7 +170,7 @@ class Driver extends CoreDriver implements DriverInterface
 			" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
 		;
 		
-		Cursor cursor = await this.query(sql, insert, connection_name, log_query);
+		Cursor cursor = await this.query(sql, insert, settings);
 		cursor.setKind("insert");
 		return cursor;
 	}
@@ -186,8 +185,7 @@ class Driver extends CoreDriver implements DriverInterface
 		string table_name,
 		Dict where,
 		Dict update,
-		string connection_name = "default",
-		bool log_query = false
+		Dict settings = null
 	)
 	{
 		Map items = new Map();
@@ -216,7 +214,7 @@ class Driver extends CoreDriver implements DriverInterface
 			" where " ~ rs::join(" and ", v_where)
 		;
 		
-		Cursor cursor = await this.query(sql, items, connection_name, log_query);
+		Cursor cursor = await this.query(sql, items, settings);
 		cursor.setKind("update");
 		return cursor;
 	}
@@ -231,8 +229,7 @@ class Driver extends CoreDriver implements DriverInterface
 		string table_name,
 		Dict insert,
 		Dict update,
-		string connection_name = "default",
-		bool log_query = false
+		Dict settings = null
 	)
 	{
 		Cursor c = null;
@@ -273,8 +270,7 @@ class Driver extends CoreDriver implements DriverInterface
 		(
 			"select * from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
 			ins_items,
-			connection_name,
-			log_query
+			settings
 		)
 		;
 		Dict row = await c.fetch();
@@ -283,14 +279,14 @@ class Driver extends CoreDriver implements DriverInterface
 		/* Update */
 		if (row)
 		{
-			c = await this.update(table_name, ins_items, upd_items, connection_name, log_query);
+			c = await this.update(table_name, ins_items, upd_items, settings);
 			await c.close();
 		}
 		
 		/* Insert */
 		else
 		{
-			c = await this.insert(table_name, items, connection_name, log_query);
+			c = await this.insert(table_name, items, settings);
 			await c.close();
 		}
 	}
@@ -305,8 +301,7 @@ class Driver extends CoreDriver implements DriverInterface
 		string table_name,
 		Dict insert,
 		Dict update,
-		string connection_name = "default",
-		bool log_query = false
+		Dict settings = null
 	)
 	{
 		Vector ins_keys = new Vector();
@@ -344,7 +339,7 @@ class Driver extends CoreDriver implements DriverInterface
 			)
 		;
 		
-		Cursor c = await this.query(sql, items, connection_name, log_query);
+		Cursor c = await this.query(sql, items, settings);
 		c.close();
 	}
 	
@@ -357,8 +352,7 @@ class Driver extends CoreDriver implements DriverInterface
 	(
 		string table_name,
 		Dict where = null,
-		string connection_name = "default",
-		bool log_query = false
+		Dict settings = null
 	)
 	{
 		Map items = new Map();
@@ -373,7 +367,7 @@ class Driver extends CoreDriver implements DriverInterface
 		);
 		
 		string sql = "delete from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
-		Cursor cursor = await this.query(sql, items, connection_name, log_query);
+		Cursor cursor = await this.query(sql, items, settings);
 		cursor.setKind("delete");
 		return cursor;
 	}
@@ -383,7 +377,7 @@ class Driver extends CoreDriver implements DriverInterface
 	/**
 	 * Execute query
 	 */
-	Cursor execute(QueryBuilder q, string connection_name = "default", bool log_query = false)
+	Cursor execute(QueryBuilder q, Dict settings = null)
 	{
 		fn escape = string (string item) => static::escape(item);
 		
@@ -438,7 +432,7 @@ class Driver extends CoreDriver implements DriverInterface
 			if (q._limit >= 0) sql ~= " LIMIT " ~ q._limit;
 			if (q._start >= 0) sql ~= " OFFSET " ~ q._start;
 			
-			Cursor cursor = await this.query(sql, params.toDict(), connection_name, log_query);
+			Cursor cursor = await this.query(sql, params.toDict(), settings);
 			return cursor;
 		}
 		
