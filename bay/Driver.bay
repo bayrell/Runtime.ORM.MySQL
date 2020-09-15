@@ -430,7 +430,7 @@ class Driver extends CoreDriver implements DriverInterface
 			
 			/* Add order */
 			if (q._limit >= 0) sql ~= " LIMIT " ~ q._limit;
-			if (q._start >= 0) sql ~= " OFFSET " ~ q._start;
+			if (q._limit >= 0 and q._start >= 0) sql ~= " OFFSET " ~ q._start;
 			
 			Cursor cursor = await this.query(sql, params.toDict(), settings);
 			return cursor;
