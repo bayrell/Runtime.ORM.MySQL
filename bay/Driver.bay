@@ -109,13 +109,49 @@ class Driver extends CoreDriver implements DriverInterface
 	
 	
 	/**
+	 * Convert filter
+	 */
+	public list<Collection, Dict> convertFilter(Dict filter)
+	{
+		Map items = new Map();
+		Vector where = new Vector();
+		
+		filter.each
+		(
+			void (var value, string key) use (items, where)
+			{
+				if (rtl::isString(value))
+				{
+					where.push("`" ~ key ~ "` = :where_" ~ key);
+					items.set("where_" ~ key, value);
+				}
+				else if (value instanceof Collection)
+				{
+					Vector keys = new Vector();
+					for (int i=0; i<value.count(); i++)
+					{
+						string v = value[i];
+						keys.push(":where_" ~ key ~ "_" ~ i);
+						items.set("where_" ~ key ~ "_" ~ i, v);
+					}
+					where.push("`" ~ key ~ "` in (" ~ rs::join(",", keys) ~ ")");
+				}
+			}
+		);
+		
+		return [where.toCollection(), items.toDict()];
+	}
+	
+	
+	
+	/**
 	 * Select query
 	 */
 	public async Cursor select
 	(
 		string table_name,
-		Dict where = null,
-		int start, int limit,
+		Dict filter = null,
+		int start = -1, int limit = -1,
 		Dict settings = null
 	)
 	{
@@ -124,18 +160,13 @@ class Driver extends CoreDriver implements DriverInterface
 		
 		Map items = new Map();
 		Vector v_where = new Vector();
-		where.each
-		(
-			void (string value, string key) use (items, v_where)
-			{
-				v_where.push("`" ~ key ~ "` = :where_" ~ key);
-				items.set("where_" ~ key, value);
-			}
-		);
+		list res = static::convertFilter(filter);
+		v_where = v_where.concat(res[0]);
+		items = items.concat(res[1]);
 		
 		string sql = "select * from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
 		if (limit >= 0) sql ~= " limit " ~ limit;
-		if (start >= 0) sql ~= " offset " ~ start;
+		if (limit >= 0 and start >= 0) sql ~= " offset " ~ start;
 		
 		Cursor cursor = await this.query(sql, items, settings);
 		cursor.setKind("select");
@@ -183,7 +214,7 @@ class Driver extends CoreDriver implements DriverInterface
 	public async Cursor update
 	(
 		string table_name,
-		Dict where,
+		Dict filter,
 		Dict update,
 		Dict settings = null
 	)
@@ -192,14 +223,9 @@ class Driver extends CoreDriver implements DriverInterface
 		Vector v_set = new Vector();
 		Vector v_where = new Vector();
 		
-		where.each
-		(
-			void (string value, string key) use (items, v_set, v_where)
-			{
-				v_where.push("`" ~ key ~ "` = :where_" ~ key);
-				items.set("where_" ~ key, value);
-			}
-		);
+		list res = static::convertFilter(filter);
+		v_where = v_where.concat(res[0]);
+		items = items.concat(res[1]);
 		
 		update.each
 		(
@@ -351,20 +377,15 @@ class Driver extends CoreDriver implements DriverInterface
 	public async Cursor delete
 	(
 		string table_name,
-		Dict where = null,
+		Dict filter = null,
 		Dict settings = null
 	)
 	{
 		Map items = new Map();
 		Vector v_where = new Vector();
-		where.each
-		(
-			void (string value, string key) use (items, v_where)
-			{
-				v_where.push("`" ~ key ~ "` = :where_" ~ key);
-				items.set("where_" ~ key, value);
-			}
-		);
+		list res = static::convertFilter(filter);
+		v_where = v_where.concat(res[0]);
+		items = items.concat(res[1]);
 		
 		string sql = "delete from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
 		Cursor cursor = await this.query(sql, items, settings);
@@ -403,15 +424,10 @@ class Driver extends CoreDriver implements DriverInterface
 			/* Add where */
 			if (q._where != null)
 			{
-				Vector<string> where = new Vector();
-				q._where.each
-				(
-					void (var value, string key) use (where, params, escape)
-					{
-						where.push(escape(key) ~ " = :" ~ key);
-						params.set(key, value);
-					}
-				);
+				list res = static::convertFilter(q._where);
+				Dict where = res[0];
+				params = params.concat(res[1]);
+				
 				string where_str = rs::join(" AND ", where);
 				if (where_str != "") sql ~= " WHERE " ~ where_str;
 			}

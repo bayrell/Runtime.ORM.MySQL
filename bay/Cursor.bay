@@ -112,7 +112,8 @@ class Cursor implements CursorInterface
 		{
 			try
 			{
-				$this->st->execute($params != null ? $params->_map : []);
+				$params = \Runtime\RuntimeUtils::PrimitiveToNative($ctx, $params);
+				$this->st->execute($params != null ? $params : []);
 			}
 			catch (\PDOException $e)
 			{
