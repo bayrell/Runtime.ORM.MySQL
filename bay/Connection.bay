@@ -18,17 +18,18 @@
 
 namespace Runtime.ORM.MySQL;
 
-use Runtime.ORM.Connection as BaseConnection;
-use Runtime.ORM.ProviderInterface;
+use Runtime.ORM.ConnectionInterface;
+use Runtime.ORM.QueryBuilder;
 use Runtime.ORM.MySQL.Cursor;
 use Runtime.ORM.MySQL.Settings;
 
 
-class Connection
+class Connection implements ConnectionInterface
 {
 	var pdo = null;
 	string last_error = "";
 	int last_code = 0;
+	
 	
 	
 	/**
@@ -106,4 +107,430 @@ class Connection
 		return null;
 	}
 	
+	
+	
+	/**
+	 * Execute query
+	 */
+	public async Cursor query
+	(
+		string sql,
+		Dict params = null,
+		Dict settings = null
+	)
+	{
+		string log_query = false;
+		if (settings != null and settings.has("debug")) log_query = settings["debug"] |> default bool false;
+		if (settings != null and settings.has("log")) log_query = settings["log"] |> default bool false;
+		
+		/* Execute */
+		Cursor cursor = await this.prepare(sql);
+		await cursor.execute(params, log_query);
+		
+		/* Return cursor */
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Select query
+	 */
+	public async Cursor select
+	(
+		string table_name,
+		Collection<list> filter = null,
+		int start = -1, int limit = -1,
+		Dict settings = null
+	)
+	{
+		start = rtl::toInt(start);
+		limit = rtl::toInt(limit);
+		
+		Map items = new Map();
+		Vector v_where = new Vector();
+		list res = this.convertFilter(filter);
+		v_where = v_where.concat(res[0]);
+		items = items.concat(res[1]);
+		
+		string sql = "select * from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
+		if (limit >= 0) sql ~= " limit " ~ limit;
+		if (limit >= 0 and start >= 0) sql ~= " offset " ~ start;
+		
+		Cursor cursor = await this.query(sql, items, settings);
+		cursor.setKind("select");
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Insert query
+	 */
+	public async Cursor insert
+	(
+		string table_name,
+		Dict insert,
+		Dict settings = null
+	)
+	{
+		Vector keys = new Vector();
+		Vector values = new Vector();
+		
+		insert.each
+		(
+			void (string value, string key) use (keys, values)
+			{
+				keys.push("`" ~ key ~ "`");
+				values.push(":" ~ key);
+			}
+		);
+		
+		string sql = "insert into " ~ table_name ~
+			" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
+		;
+		
+		Cursor cursor = await this.query(sql, insert, settings);
+		cursor.setKind("insert");
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Update query
+	 */
+	public async Cursor update
+	(
+		string table_name,
+		Collection<list> filter,
+		Dict update,
+		Dict settings = null
+	)
+	{
+		Map items = new Map();
+		Vector v_set = new Vector();
+		Vector v_where = new Vector();
+		
+		list res = this.convertFilter(filter);
+		v_where = v_where.concat(res[0]);
+		items = items.concat(res[1]);
+		
+		update.each
+		(
+			void (string value, string key) use (items, v_set, v_where)
+			{
+				v_set.push("`" ~ key ~ "` = :update_" ~ key);
+				items.set("update_" ~ key, value);
+			}
+		);
+		
+		string sql = "update " ~ table_name ~ " set " ~ rs::join(", ", v_set) ~
+			" where " ~ rs::join(" and ", v_where)
+		;
+		
+		Cursor cursor = await this.query(sql, items, settings);
+		cursor.setKind("update");
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Insert or update
+	 */
+	public async void insert_or_update
+	(
+		string table_name,
+		Dict insert,
+		Dict update,
+		Dict settings = null
+	)
+	{
+		Cursor c = null;
+		Vector ins_keys = new Vector();
+		Vector ins_values = new Vector();
+		Vector where_data = new Vector();
+		Vector upd_data = new Vector();
+		Map items = new Map();
+		Map ins_items = new Map();
+		Map upd_items = new Map();
+		
+		insert.each
+		(
+			void (string value, string key) use (ins_keys, ins_values, where_data, items, ins_items)
+			{
+				ins_keys.push("`" ~ key ~ "`");
+				ins_values.push(":" ~ key);
+				where_data.push("`" ~ key ~ "` = :" ~ key);
+				items.set(key, value);
+				ins_items.set(key, value);
+			}
+		);
+		
+		update.each
+		(
+			void (string value, string key) use (ins_keys, ins_values, upd_data, items, upd_items)
+			{
+				ins_keys.push("`" ~ key ~ "`");
+				ins_values.push(":" ~ key);
+				upd_data.push("`" ~ key ~ "` = :" ~ key);
+				items.set(key, value);
+				upd_items.set(key, value);
+			}
+		);
+		
+		/* Find item */
+		c = await this.query
+		(
+			"select * from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
+			ins_items,
+			settings
+		)
+		;
+		Dict row = await c.fetch();
+		await c.close();
+		
+		/* Update */
+		if (row)
+		{
+			Vector filter = new Vector();
+			ins_items.each
+			(
+				void (var value, string key) use (filter)
+				{
+					filter.push([key, "=", value]);
+				}
+			);
+			c = await this.update(table_name, filter.toCollection(), upd_items, settings);
+			await c.close();
+		}
+		
+		/* Insert */
+		else
+		{
+			c = await this.insert(table_name, items, settings);
+			await c.close();
+		}
+	}
+	
+	
+	
+	/**
+	 * Insert or update
+	 */
+	public async void insert_or_update_atom
+	(
+		string table_name,
+		Dict insert,
+		Dict update,
+		Dict settings = null
+	)
+	{
+		Vector ins_keys = new Vector();
+		Vector ins_values = new Vector();
+		Vector upd_data = new Vector();
+		Map items = new Map();
+		
+		insert.each
+		(
+			void (string value, string key) use (ins_keys, ins_values, items)
+			{
+				ins_keys.push("`" ~ key ~ "`");
+				ins_values.push(":" ~ key);
+				items.set(key, value);
+			}
+		);
+		
+		update.each
+		(
+			void (string value, string key) use (ins_keys, ins_values, upd_data, items)
+			{
+				ins_keys.push("`" ~ key ~ "`");
+				ins_values.push(":" ~ key);
+				upd_data.push("`" ~ key ~ "` = :" ~ key);
+				items.set(key, value);
+			}
+		);
+		
+		string sql = "insert into " ~ table_name ~
+			" (" ~ rs::join(", ", ins_keys) ~ ")" ~
+			" values (" ~ rs::join(", ", ins_values) ~ ")" ~
+			(
+				(upd_data.count() == 0) ? "" :
+					" ON DUPLICATE KEY UPDATE " ~ rs::join(", ", upd_data)
+			)
+		;
+		
+		Cursor c = await this.query(sql, items, settings);
+		c.close();
+	}
+	
+	
+	
+	/**
+	 * Delete query
+	 */
+	public async Cursor delete
+	(
+		string table_name,
+		Collection<list> filter = null,
+		Dict settings = null
+	)
+	{
+		Map items = new Map();
+		Vector v_where = new Vector();
+		list res = this.convertFilter(filter);
+		v_where = v_where.concat(res[0]);
+		items = items.concat(res[1]);
+		
+		string sql = "delete from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
+		Cursor cursor = await this.query(sql, items, settings);
+		cursor.setKind("delete");
+		return cursor;
+	}
+	
+	
+	
+	/**
+	 * Execute query
+	 */
+	async Cursor execute(QueryBuilder q, Dict settings = null)
+	{
+		/* Select query */
+		if (q._kind == QueryBuilder::QUERY_SELECT)
+		{
+			string sql = "SELECT ";
+			Map params = new Map();
+			
+			/* Add found rows */
+			if (q._found_rows == true) sql ~= " SQL_CALC_FOUND_ROWS ";
+			
+			/* Add fields */
+			if (q._fields != null) sql ~= rs::join(", ", q._fields);
+			
+			/* Add table name */
+			string table_name = q._table_name;
+			sql ~= " FROM " ~ table_name;
+			
+			/* Add table alias */
+			if (q._table_name_alias != "") sql ~= " AS " ~ q._table_name_alias;
+			
+			/* Add where */
+			if (q._filter != null)
+			{
+				list res = this.convertFilter(q._filter);
+				Dict where = res[0];
+				params = params.concat(res[1]);
+				
+				string where_str = rs::join(" AND ", where);
+				if (where_str != "") sql ~= " WHERE " ~ where_str;
+			}
+			
+			/* Add order */
+			if (q._order != null)
+			{
+				Collection order = q._order.map
+				(
+					string (Collection order) => order[0] ~ " " ~ order[1]
+				);
+				
+				string order_str = rs::join(", ", order);
+				if (order_str != "") sql ~= " ORDER BY " ~ order_str;
+			}
+			
+			/* Add order */
+			if (q._limit >= 0) sql ~= " LIMIT " ~ q._limit;
+			if (q._limit >= 0 and q._start >= 0) sql ~= " OFFSET " ~ q._start;
+			
+			Cursor cursor = await this.query(sql, params.toDict(), settings);
+			return cursor;
+		}
+		
+		return null;
+	}
+	
+	
+	
+	/**
+	 * Convert filter
+	 */
+	list<Collection, Dict> convertFilter(Collection<list> filter)
+	{
+		Map items = new Map();
+		Vector where = new Vector();
+		
+		for (int i=0; i<filter.count(); i++)
+		{
+			Collection item = filter[i];
+			string field_name = item[0] |> default string "";
+			string op = item[1] |> default string "=";
+			string value = item[2];
+			if (rtl::isEmpty(field_name) and rtl::isEmpty(op))
+			{
+				continue;
+			}
+			
+			/* Check operation */
+			if 
+			(
+				op != "=" and op != "!=" and op != ">=" and op != "<=" and op != "<" and op != ">"
+			)
+			{
+				op = "=";
+			}
+			
+			if (rtl::isString(value))
+			{
+				where.push(this.escape(field_name) ~ " " ~ op ~ " :where_" ~ field_name);
+				items.set("where_" ~ field_name, value);
+			}
+			else if (value instanceof Collection)
+			{
+				Vector keys = new Vector();
+				for (int i=0; i<value.count(); i++)
+				{
+					string v = value[i];
+					keys.push(":where_" ~ field_name ~ "_" ~ i);
+					items.set("where_" ~ field_name ~ "_" ~ i, v);
+				}
+				where.push(this.escape(field_name) ~ " in (" ~ rs::join(",", keys) ~ ")");
+			}
+			else if (value === null)
+			{
+				if (op == "!=") where.push(this.escape(field_name) ~ " is not null");
+				else where.push(this.escape(field_name) ~ " is null");
+			}
+		}
+		
+		return [where.toCollection(), items.toDict()];
+	}
+	
+	
+	
+	/**
+	 * Escape
+	 */
+	string escape(string item)
+	{
+		#switch
+		#case ifcode PHP then
+		return "`" . $item . "`";
+		#endswitch
+		return "";
+	}
+	
+	
+	
+	/**
+	 * Escape
+	 */
+	string quote(string item)
+	{
+		#switch
+		#case ifcode PHP then
+		return "`" . $this->pdo->quote($item) . "`";
+		#endswitch
+		return "";
+	}
 }
