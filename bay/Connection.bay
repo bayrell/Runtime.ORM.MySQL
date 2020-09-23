@@ -45,7 +45,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Connect by provider
 	 */
-	async static Connection connect(Settings settings)
+	async static Connection connect(Settings db_settings)
 	{
 		Connection conn = new Connection();
 		
@@ -57,12 +57,12 @@ class Connection implements ConnectionInterface
 		$conn->last_code = 0;
 		try
 		{
-			$str = 'mysql:host='.$settings->host;
-			if ($settings->port != null) $str .= ':'.$settings->port;
-			if ($settings->db != null) $str .= ';dbname='.$settings->db;
+			$str = 'mysql:host='.$db_settings->host;
+			if ($db_settings->port != null) $str .= ':'.$db_settings->port;
+			if ($db_settings->db != null) $str .= ';dbname='.$db_settings->db;
 			$conn->pdo = new \PDO
 			(
-				$str, $settings->username, $settings->password, 
+				$str, $db_settings->username, $db_settings->password, 
 				array
 				(
 					\PDO::ATTR_PERSISTENT => false
@@ -116,12 +116,12 @@ class Connection implements ConnectionInterface
 	(
 		string sql,
 		Dict params = null,
-		Dict settings = null
+		Dict db_settings = null
 	)
 	{
 		string log_query = false;
-		if (settings != null and settings.has("debug")) log_query = settings["debug"] |> default bool false;
-		if (settings != null and settings.has("log")) log_query = settings["log"] |> default bool false;
+		if (db_settings != null and db_settings.has("debug")) log_query = db_settings["debug"] |> default bool false;
+		if (db_settings != null and db_settings.has("log")) log_query = db_settings["log"] |> default bool false;
 		
 		/* Execute */
 		Cursor cursor = await this.prepare(sql);
@@ -141,7 +141,7 @@ class Connection implements ConnectionInterface
 		string table_name,
 		Collection<list> filter = null,
 		int start = -1, int limit = -1,
-		Dict settings = null
+		Dict db_settings = null
 	)
 	{
 		start = rtl::toInt(start);
@@ -157,7 +157,7 @@ class Connection implements ConnectionInterface
 		if (limit >= 0) sql ~= " limit " ~ limit;
 		if (limit >= 0 and start >= 0) sql ~= " offset " ~ start;
 		
-		Cursor cursor = await this.query(sql, items, settings);
+		Cursor cursor = await this.query(sql, items, db_settings);
 		cursor.setKind("select");
 		return cursor;
 	}
@@ -171,7 +171,7 @@ class Connection implements ConnectionInterface
 	(
 		string table_name,
 		Dict insert,
-		Dict settings = null
+		Dict db_settings = null
 	)
 	{
 		Vector keys = new Vector();
@@ -190,7 +190,7 @@ class Connection implements ConnectionInterface
 			" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
 		;
 		
-		Cursor cursor = await this.query(sql, insert, settings);
+		Cursor cursor = await this.query(sql, insert, db_settings);
 		cursor.setKind("insert");
 		return cursor;
 	}
@@ -205,7 +205,7 @@ class Connection implements ConnectionInterface
 		string table_name,
 		Collection<list> filter,
 		Dict update,
-		Dict settings = null
+		Dict db_settings = null
 	)
 	{
 		Map items = new Map();
@@ -229,7 +229,7 @@ class Connection implements ConnectionInterface
 			" where " ~ rs::join(" and ", v_where)
 		;
 		
-		Cursor cursor = await this.query(sql, items, settings);
+		Cursor cursor = await this.query(sql, items, db_settings);
 		cursor.setKind("update");
 		return cursor;
 	}
@@ -244,7 +244,7 @@ class Connection implements ConnectionInterface
 		string table_name,
 		Dict insert,
 		Dict update,
-		Dict settings = null
+		Dict db_settings = null
 	)
 	{
 		Cursor c = null;
@@ -285,7 +285,7 @@ class Connection implements ConnectionInterface
 		(
 			"select * from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
 			ins_items,
-			settings
+			db_settings
 		)
 		;
 		Dict row = await c.fetch();
@@ -302,14 +302,14 @@ class Connection implements ConnectionInterface
 					filter.push([key, "=", value]);
 				}
 			);
-			c = await this.update(table_name, filter.toCollection(), upd_items, settings);
+			c = await this.update(table_name, filter.toCollection(), upd_items, db_settings);
 			await c.close();
 		}
 		
 		/* Insert */
 		else
 		{
-			c = await this.insert(table_name, items, settings);
+			c = await this.insert(table_name, items, db_settings);
 			await c.close();
 		}
 	}
@@ -324,7 +324,7 @@ class Connection implements ConnectionInterface
 		string table_name,
 		Dict insert,
 		Dict update,
-		Dict settings = null
+		Dict db_settings = null
 	)
 	{
 		Vector ins_keys = new Vector();
@@ -362,7 +362,7 @@ class Connection implements ConnectionInterface
 			)
 		;
 		
-		Cursor c = await this.query(sql, items, settings);
+		Cursor c = await this.query(sql, items, db_settings);
 		c.close();
 	}
 	
@@ -375,7 +375,7 @@ class Connection implements ConnectionInterface
 	(
 		string table_name,
 		Collection<list> filter = null,
-		Dict settings = null
+		Dict db_settings = null
 	)
 	{
 		Map items = new Map();
@@ -385,7 +385,7 @@ class Connection implements ConnectionInterface
 		items = items.concat(res[1]);
 		
 		string sql = "delete from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
-		Cursor cursor = await this.query(sql, items, settings);
+		Cursor cursor = await this.query(sql, items, db_settings);
 		cursor.setKind("delete");
 		return cursor;
 	}
@@ -395,7 +395,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Execute query
 	 */
-	async Cursor execute(QueryBuilder q, Dict settings = null)
+	async Cursor execute(QueryBuilder q, Dict db_settings = null)
 	{
 		/* Select query */
 		if (q._kind == QueryBuilder::QUERY_SELECT)
@@ -443,7 +443,7 @@ class Connection implements ConnectionInterface
 			if (q._limit >= 0) sql ~= " LIMIT " ~ q._limit;
 			if (q._limit >= 0 and q._start >= 0) sql ~= " OFFSET " ~ q._start;
 			
-			Cursor cursor = await this.query(sql, params.toDict(), settings);
+			Cursor cursor = await this.query(sql, params.toDict(), db_settings);
 			return cursor;
 		}
 		
@@ -455,11 +455,10 @@ class Connection implements ConnectionInterface
 	/**
 	 * Convert filter
 	 */
-	list<Collection, Dict> convertFilter(Collection<list> filter)
+	list<Collection, Dict> convertFilter(Collection<list> filter, int field_index = 0)
 	{
 		Map items = new Map();
 		Vector where = new Vector();
-		
 		for (int i=0; i<filter.count(); i++)
 		{
 			Collection item = filter[i];
@@ -468,6 +467,25 @@ class Connection implements ConnectionInterface
 			string value = item[2];
 			if (rtl::isEmpty(field_name) and rtl::isEmpty(op))
 			{
+				continue;
+			}
+			
+			/* or */
+			if (field_name == "\$or")
+			{
+				Vector arr_where = new Vector();
+				Collection arr = item[1] |> default Collection [];
+				for (int i=0; i<arr.count(); i++)
+				{
+					Collection<list> filter_or = arr[i];
+					list res = this.convertFilter(filter_or, field_index);
+					Collection where_or = res[0];
+					Dict items_or = res[1];
+					field_index = res[2];
+					arr_where.push( rs::join(" AND ", where_or) );
+					items = items.concat(items_or);
+				}
+				where.push( "(" ~ rs::join(" OR ", arr_where) ~ ")" );
 				continue;
 			}
 			
@@ -482,8 +500,10 @@ class Connection implements ConnectionInterface
 			
 			if (rtl::isString(value))
 			{
-				where.push(this.escape(field_name) ~ " " ~ op ~ " :where_" ~ field_name);
-				items.set("where_" ~ field_name, value);
+				string field_key = "where_" ~ field_name ~ "_" ~ field_index;
+				where.push(this.escape(field_name) ~ " " ~ op ~ " :" ~ field_key);
+				items.set(field_key, value);
+				field_index++;
 			}
 			else if (value instanceof Collection)
 			{
@@ -491,8 +511,10 @@ class Connection implements ConnectionInterface
 				for (int i=0; i<value.count(); i++)
 				{
 					string v = value[i];
-					keys.push(":where_" ~ field_name ~ "_" ~ i);
-					items.set("where_" ~ field_name ~ "_" ~ i, v);
+					string field_key = "where_" ~ field_name ~ "_" ~ i ~ "_" ~ field_index;
+					keys.push(":" ~ field_key);
+					items.set(field_key, v);
+					field_index++;
 				}
 				where.push(this.escape(field_name) ~ " in (" ~ rs::join(",", keys) ~ ")");
 			}
@@ -503,7 +525,7 @@ class Connection implements ConnectionInterface
 			}
 		}
 		
-		return [where.toCollection(), items.toDict()];
+		return [where.toCollection(), items.toDict(), field_index];
 	}
 	
 	
