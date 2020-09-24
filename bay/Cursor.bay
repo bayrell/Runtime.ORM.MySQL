@@ -69,6 +69,7 @@ class Cursor implements CursorInterface
 	 */
 	string quote(string value)
 	{
+		if (value === null) return "NULL";
 		#switch
 		#case ifcode PHP then
 		return $this->conn->pdo->quote($value);
