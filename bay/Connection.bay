@@ -407,14 +407,43 @@ class Connection implements ConnectionInterface
 			if (q._found_rows == true) sql ~= " SQL_CALC_FOUND_ROWS ";
 			
 			/* Add fields */
-			if (q._fields != null) sql ~= rs::join(", ", q._fields);
+			if (q._fields != null) sql ~= rs::join(", ", q._fields.map( method this.escape ));
+			
+			/* New line */
+			sql ~= "\n";
 			
 			/* Add table name */
 			string table_name = q._table_name;
-			sql ~= " FROM " ~ table_name;
+			sql ~= " FROM " ~ table_name ;
 			
 			/* Add table alias */
 			if (q._table_name_alias != "") sql ~= " AS " ~ q._table_name_alias;
+			
+			/* New line */
+			sql ~= "\n";
+			
+			/* Add joins */
+			if (q._join != null)
+			{
+				for (int i=0; i<q._join.count(); i++)
+				{
+					Dict join = q._join[i];
+					string kind = join["kind"] |> default string "";
+					string table_name = join["table_name"] |> default string "";
+					string alias_name = join["alias_name"] |> default string "";
+					string where = join["where"] |> default string "";
+					
+					if (kind == "left") sql ~= " LEFT JOIN ";
+					else sql ~= " INNER JOIN ";
+					
+					sql ~= table_name;
+					if (alias_name != "") sql ~= " AS " ~ alias_name;
+					sql ~= " ON (" ~ where ~ ")";
+					
+					/* New line */
+					sql ~= "\n";
+				}
+			}
 			
 			/* Add where */
 			if (q._filter != null)
@@ -425,6 +454,9 @@ class Connection implements ConnectionInterface
 				
 				string where_str = rs::join(" AND ", where);
 				if (where_str != "") sql ~= " WHERE " ~ where_str;
+				
+				/* New line */
+				sql ~= "\n";
 			}
 			
 			/* Add order */
@@ -437,6 +469,9 @@ class Connection implements ConnectionInterface
 				
 				string order_str = rs::join(", ", order);
 				if (order_str != "") sql ~= " ORDER BY " ~ order_str;
+				
+				/* New line */
+				sql ~= "\n";
 			}
 			
 			/* Add order */
@@ -500,7 +535,7 @@ class Connection implements ConnectionInterface
 			
 			if (rtl::isString(value))
 			{
-				string field_key = "where_" ~ field_name ~ "_" ~ field_index;
+				string field_key = this.convertParamsKey("where_" ~ field_name ~ "_" ~ field_index);
 				where.push(this.escape(field_name) ~ " " ~ op ~ " :" ~ field_key);
 				items.set(field_key, value);
 				field_index++;
@@ -511,7 +546,7 @@ class Connection implements ConnectionInterface
 				for (int i=0; i<value.count(); i++)
 				{
 					string v = value[i];
-					string field_key = "where_" ~ field_name ~ "_" ~ i ~ "_" ~ field_index;
+					string field_key = this.convertParamsKey("where_" ~ field_name ~ "_" ~ i ~ "_" ~ field_index);
 					keys.push(":" ~ field_key);
 					items.set(field_key, v);
 					field_index++;
@@ -531,21 +566,28 @@ class Connection implements ConnectionInterface
 	
 	
 	/**
-	 * Escape
+	 * Convert params key
 	 */
-	string escape(string item)
+	string convertParamsKey(string field_key)
 	{
-		#switch
-		#case ifcode PHP then
-		return "`" . $item . "`";
-		#endswitch
-		return "";
+		field_key = rs::replace(".", "_", field_key);
+		return field_key;
 	}
 	
 	
 	
 	/**
 	 * Escape
+	 */
+	string escape(string item)
+	{
+		return item;
+	}
+	
+	
+	
+	/**
+	 * Quote
 	 */
 	string quote(string item)
 	{
