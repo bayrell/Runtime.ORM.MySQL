@@ -533,7 +533,7 @@ class Connection implements ConnectionInterface
 				op = "=";
 			}
 			
-			if (rtl::isString(value))
+			if (rtl::isString(value) or rtl::isInt(value) or rtl::isBool(value))
 			{
 				string field_key = this.convertParamsKey("where_" ~ field_name ~ "_" ~ field_index);
 				where.push(this.escape(field_name) ~ " " ~ op ~ " :" ~ field_key);
