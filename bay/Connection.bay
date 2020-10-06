@@ -29,6 +29,7 @@ class Connection implements ConnectionInterface
 	var pdo = null;
 	string last_error = "";
 	int last_code = 0;
+	Settings settings = null;
 	
 	
 	
@@ -52,6 +53,7 @@ class Connection implements ConnectionInterface
 		#switch
 		#case ifcode PHP then
 		
+		$conn->settings = $db_settings;
 		$conn->pdo = null;
 		$conn->last_error = "";
 		$conn->last_code = 0;
@@ -123,6 +125,9 @@ class Connection implements ConnectionInterface
 		if (db_settings != null and db_settings.has("debug")) log_query = db_settings["debug"] |> default bool false;
 		if (db_settings != null and db_settings.has("log")) log_query = db_settings["log"] |> default bool false;
 		
+		/* Add prefix */
+		sql = rs::replace("\${prefix}", this.settings.prefix, sql);
+		
 		/* Execute */
 		Cursor cursor = await this.prepare(sql);
 		await cursor.execute(params, log_query);
@@ -153,7 +158,7 @@ class Connection implements ConnectionInterface
 		v_where = v_where.concat(res[0]);
 		items = items.concat(res[1]);
 		
-		string sql = "select * from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
+		string sql = "select * from \${prefix}" ~ table_name ~ " where " ~ rs::join(" and ", v_where);
 		if (limit >= 0) sql ~= " limit " ~ limit;
 		if (limit >= 0 and start >= 0) sql ~= " offset " ~ start;
 		
@@ -186,7 +191,7 @@ class Connection implements ConnectionInterface
 			}
 		);
 		
-		string sql = "insert into " ~ table_name ~
+		string sql = "insert into \${prefix}" ~ table_name ~
 			" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
 		;
 		
@@ -225,7 +230,7 @@ class Connection implements ConnectionInterface
 			}
 		);
 		
-		string sql = "update " ~ table_name ~ " set " ~ rs::join(", ", v_set) ~
+		string sql = "update \${prefix}" ~ table_name ~ " set " ~ rs::join(", ", v_set) ~
 			" where " ~ rs::join(" and ", v_where)
 		;
 		
@@ -283,7 +288,7 @@ class Connection implements ConnectionInterface
 		/* Find item */
 		c = await this.query
 		(
-			"select * from `" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
+			"select * from `\${prefix}" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
 			ins_items,
 			db_settings
 		)
@@ -353,7 +358,7 @@ class Connection implements ConnectionInterface
 			}
 		);
 		
-		string sql = "insert into " ~ table_name ~
+		string sql = "insert into \${prefix}" ~ table_name ~
 			" (" ~ rs::join(", ", ins_keys) ~ ")" ~
 			" values (" ~ rs::join(", ", ins_values) ~ ")" ~
 			(
@@ -384,7 +389,7 @@ class Connection implements ConnectionInterface
 		v_where = v_where.concat(res[0]);
 		items = items.concat(res[1]);
 		
-		string sql = "delete from " ~ table_name ~ " where " ~ rs::join(" and ", v_where);
+		string sql = "delete from \${prefix}" ~ table_name ~ " where " ~ rs::join(" and ", v_where);
 		Cursor cursor = await this.query(sql, items, db_settings);
 		cursor.setKind("delete");
 		return cursor;
@@ -414,7 +419,7 @@ class Connection implements ConnectionInterface
 			
 			/* Add table name */
 			string table_name = q._table_name;
-			sql ~= " FROM " ~ table_name ;
+			sql ~= " FROM \${prefix}" ~ table_name;
 			
 			/* Add table alias */
 			if (q._table_name_alias != "") sql ~= " AS " ~ q._table_name_alias;
@@ -436,7 +441,7 @@ class Connection implements ConnectionInterface
 					if (kind == "left") sql ~= " LEFT JOIN ";
 					else sql ~= " INNER JOIN ";
 					
-					sql ~= table_name;
+					sql ~= "\${prefix}" ~ table_name;
 					if (alias_name != "") sql ~= " AS " ~ alias_name;
 					sql ~= " ON (" ~ where ~ ")";
 					
