@@ -94,6 +94,38 @@ class Connection implements ConnectionInterface
 	
 	
 	/**
+	 * Process item from database
+	 */
+	async var fromDatabase(string type, var item)
+	{
+		if (type == "json")
+		{
+		}
+		else if (type == "datetime")
+		{
+		}
+		return item;
+	}
+	
+	
+	
+	/**
+	 * Process item to database
+	 */
+	async var toDatabase(string type, var item)
+	{
+		if (type == "json")
+		{
+		}
+		else if (type == "datetime")
+		{
+		}
+		return item;
+	}
+	
+	
+	
+	/**
 	 * Prepares SQL and return Cursor for execute
 	 */
 	async Cursor prepare(string sql)

@@ -45,6 +45,16 @@ class Cursor implements CursorInterface
 	
 	
 	/**
+	 * Returns connection
+	 */
+	public void getConnection()
+	{
+		return this.conn;
+	}
+	
+	
+	
+	/**
 	 * Set kind
 	 */
 	public void setKind(string kind)
