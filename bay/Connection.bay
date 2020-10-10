@@ -18,6 +18,8 @@
 
 namespace Runtime.ORM.MySQL;
 
+use Runtime.DateTime;
+use Runtime.RuntimeUtils;
 use Runtime.ORM.ConnectionInterface;
 use Runtime.ORM.QueryBuilder;
 use Runtime.ORM.MySQL.Cursor;
@@ -100,9 +102,22 @@ class Connection implements ConnectionInterface
 	{
 		if (type == "json")
 		{
+			if (item == null) return null;
+			item = RuntimeUtils::json_decode(item);
+			return item;
 		}
 		else if (type == "datetime")
 		{
+			if (rs::strlen(item) != 19) return null;
+			return new DateTime
+			{
+				"y": rs::substr(item, 0, 4),
+				"m": rs::substr(item, 5, 2),
+				"d": rs::substr(item, 8, 2),
+				"h": rs::substr(item, 11, 2),
+				"i": rs::substr(item, 14, 2),
+				"s": rs::substr(item, 17, 2),
+			}
 		}
 		return item;
 	}
@@ -116,9 +131,17 @@ class Connection implements ConnectionInterface
 	{
 		if (type == "json")
 		{
+			item = RuntimeUtils::ObjectToPrimitive(item, false);
+			item = RuntimeUtils::json_encode(item, 1, false);
+			return item;
 		}
 		else if (type == "datetime")
 		{
+			if (item instanceof DateTime)
+			{
+				return item.getDBTimeUTC();
+			}
+			return null;
 		}
 		return item;
 	}
