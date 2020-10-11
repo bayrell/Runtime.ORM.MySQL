@@ -132,7 +132,7 @@ class Connection implements ConnectionInterface
 		if (type == "json")
 		{
 			item = RuntimeUtils::ObjectToPrimitive(item, false);
-			item = RuntimeUtils::json_encode(item, 1, false);
+			item = RuntimeUtils::json_encode(item, 1);
 			return item;
 		}
 		else if (type == "datetime")
