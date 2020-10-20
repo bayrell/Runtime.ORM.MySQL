@@ -457,6 +457,8 @@ class Connection implements ConnectionInterface
 	 */
 	async Cursor execute(QueryBuilder q, Dict db_settings = null)
 	{
+		if (db_settings == null) db_settings = {};
+		
 		/* Select query */
 		if (q._kind == QueryBuilder::QUERY_SELECT)
 		{
@@ -537,6 +539,9 @@ class Connection implements ConnectionInterface
 			/* Add order */
 			if (q._limit >= 0) sql ~= " LIMIT " ~ q._limit;
 			if (q._limit >= 0 and q._start >= 0) sql ~= " OFFSET " ~ q._start;
+			
+			/* Set debug log */
+			if (q._log) db_settings <= log <= true;
 			
 			Cursor cursor = await this.query(sql, params.toDict(), db_settings);
 			return cursor;
