@@ -486,7 +486,7 @@ class Connection implements ConnectionInterface
 			Map params = new Map();
 			
 			/* Add found rows */
-			if (q._found_rows == true) sql ~= " SQL_CALC_FOUND_ROWS ";
+			if (q._calc_found_rows == true) sql ~= " SQL_CALC_FOUND_ROWS ";
 			
 			/* Add fields */
 			if (q._fields != null) sql ~= rs::join(", ", q._fields.map( method this.escape ));
