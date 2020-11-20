@@ -65,7 +65,7 @@ class Driver extends CoreDriver implements DriverInterface
 		
 		Settings settings = @.config(["Runtime.ORM.MySQL", connection_name], null);
 		Connection conn = await Connection::connect(settings);
-		this.connections.set(connection_name, conn);
+		this.connections.setValue(connection_name, conn);
 		
 		if (not conn.connected())
 		{

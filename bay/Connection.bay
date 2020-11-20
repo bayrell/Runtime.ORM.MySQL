@@ -261,8 +261,8 @@ class Connection implements ConnectionInterface
 		(
 			void (string value, string key) use (keys, values)
 			{
-				keys.push("`" ~ key ~ "`");
-				values.push(":" ~ key);
+				keys.pushValue("`" ~ key ~ "`");
+				values.pushValue(":" ~ key);
 			}
 		);
 		
@@ -300,7 +300,7 @@ class Connection implements ConnectionInterface
 		(
 			void (string value, string key) use (items, v_set, v_where)
 			{
-				v_set.push("`" ~ key ~ "` = :update_" ~ key);
+				v_set.pushValue("`" ~ key ~ "` = :update_" ~ key);
 				items.set("update_" ~ key, value);
 			}
 		);
@@ -340,11 +340,11 @@ class Connection implements ConnectionInterface
 		(
 			void (string value, string key) use (ins_keys, ins_values, where_data, items, ins_items)
 			{
-				ins_keys.push("`" ~ key ~ "`");
-				ins_values.push(":" ~ key);
-				where_data.push("`" ~ key ~ "` = :" ~ key);
-				items.set(key, value);
-				ins_items.set(key, value);
+				ins_keys.pushValue("`" ~ key ~ "`");
+				ins_values.pushValue(":" ~ key);
+				where_data.pushValue("`" ~ key ~ "` = :" ~ key);
+				items.setValue(key, value);
+				ins_items.setValue(key, value);
 			}
 		);
 		
@@ -352,11 +352,11 @@ class Connection implements ConnectionInterface
 		(
 			void (string value, string key) use (ins_keys, ins_values, upd_data, items, upd_items)
 			{
-				ins_keys.push("`" ~ key ~ "`");
-				ins_values.push(":" ~ key);
-				upd_data.push("`" ~ key ~ "` = :" ~ key);
-				items.set(key, value);
-				upd_items.set(key, value);
+				ins_keys.pushValue("`" ~ key ~ "`");
+				ins_values.pushValue(":" ~ key);
+				upd_data.pushValue("`" ~ key ~ "` = :" ~ key);
+				items.setValue(key, value);
+				upd_items.setValue(key, value);
 			}
 		);
 		
@@ -379,7 +379,7 @@ class Connection implements ConnectionInterface
 			(
 				void (var value, string key) use (filter)
 				{
-					filter.push([key, "=", value]);
+					filter.pushValue([key, "=", value]);
 				}
 			);
 			c = await this.update(table_name, filter.toCollection(), upd_items, db_settings);
@@ -416,9 +416,9 @@ class Connection implements ConnectionInterface
 		(
 			void (string value, string key) use (ins_keys, ins_values, items)
 			{
-				ins_keys.push("`" ~ key ~ "`");
-				ins_values.push(":" ~ key);
-				items.set(key, value);
+				ins_keys.pushValue("`" ~ key ~ "`");
+				ins_values.pushValue(":" ~ key);
+				items.setValue(key, value);
 			}
 		);
 		
@@ -426,10 +426,10 @@ class Connection implements ConnectionInterface
 		(
 			void (string value, string key) use (ins_keys, ins_values, upd_data, items)
 			{
-				ins_keys.push("`" ~ key ~ "`");
-				ins_values.push(":" ~ key);
-				upd_data.push("`" ~ key ~ "` = :" ~ key);
-				items.set(key, value);
+				ins_keys.pushValue("`" ~ key ~ "`");
+				ins_values.pushValue(":" ~ key);
+				upd_data.pushValue("`" ~ key ~ "` = :" ~ key);
+				items.setValue(key, value);
 			}
 		);
 		
@@ -602,10 +602,10 @@ class Connection implements ConnectionInterface
 					Collection where_or = res[0];
 					Dict items_or = res[1];
 					field_index = res[2];
-					arr_where.push( rs::join(" AND ", where_or) );
+					arr_where.pushValue( rs::join(" AND ", where_or) );
 					items = items.concat(items_or);
 				}
-				where.push( "(" ~ rs::join(" OR ", arr_where) ~ ")" );
+				where.pushValue( "(" ~ rs::join(" OR ", arr_where) ~ ")" );
 				continue;
 			}
 			
@@ -621,8 +621,8 @@ class Connection implements ConnectionInterface
 			if (rtl::isString(value) or rtl::isInt(value) or rtl::isBool(value))
 			{
 				string field_key = this.convertParamsKey("where_" ~ field_name ~ "_" ~ field_index);
-				where.push(this.escape(field_name) ~ " " ~ op ~ " :" ~ field_key);
-				items.set(field_key, value);
+				where.pushValue(this.escape(field_name) ~ " " ~ op ~ " :" ~ field_key);
+				items.setValue(field_key, value);
 				field_index++;
 			}
 			else if (value instanceof Collection)
@@ -632,16 +632,16 @@ class Connection implements ConnectionInterface
 				{
 					string v = value[i];
 					string field_key = this.convertParamsKey("where_" ~ field_name ~ "_" ~ i ~ "_" ~ field_index);
-					keys.push(":" ~ field_key);
-					items.set(field_key, v);
+					keys.pushValue(":" ~ field_key);
+					items.setValue(field_key, v);
 					field_index++;
 				}
-				where.push(this.escape(field_name) ~ " in (" ~ rs::join(",", keys) ~ ")");
+				where.pushValue(this.escape(field_name) ~ " in (" ~ rs::join(",", keys) ~ ")");
 			}
 			else if (value === null)
 			{
-				if (op == "!=") where.push(this.escape(field_name) ~ " is not null");
-				else where.push(this.escape(field_name) ~ " is null");
+				if (op == "!=") where.pushValue(this.escape(field_name) ~ " is not null");
+				else where.pushValue(this.escape(field_name) ~ " is null");
 			}
 		}
 		

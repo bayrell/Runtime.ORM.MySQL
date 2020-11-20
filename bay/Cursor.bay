@@ -191,7 +191,7 @@ class Cursor implements CursorInterface
 			{
 				row = f(row);
 			}
-			items.push(row);
+			items.pushValue(row);
 		}
 		
 		return items.toCollection();
