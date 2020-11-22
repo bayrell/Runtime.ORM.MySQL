@@ -301,7 +301,7 @@ class Connection implements ConnectionInterface
 			void (string value, string key) use (items, v_set, v_where)
 			{
 				v_set.pushValue("`" ~ key ~ "` = :update_" ~ key);
-				items.set("update_" ~ key, value);
+				items.setValue("update_" ~ key, value);
 			}
 		);
 		
