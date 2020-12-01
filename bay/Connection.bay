@@ -131,6 +131,10 @@ class Connection implements ConnectionInterface
 				"tz": "UTC",
 			}
 		}
+		else if (type == "bool")
+		{
+			if (item == "0") return false; else return true;
+		}
 		return item;
 	}
 	
@@ -162,6 +166,10 @@ class Connection implements ConnectionInterface
 				return item.getDateTime("UTC");
 			}
 			return null;
+		}
+		else if (type == "bool")
+		{
+			if (item) return "1"; else return "0";
 		}
 		return item;
 	}
