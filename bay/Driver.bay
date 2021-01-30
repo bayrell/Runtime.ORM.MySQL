@@ -18,7 +18,7 @@
 
 namespace Runtime.ORM.MySQL;
 
-use Runtime.Core.CoreDriver;
+use Runtime.BaseDriver;
 use Runtime.ORM.Exceptions.OrmException;
 use Runtime.ORM.DriverInterface;
 use Runtime.ORM.MySQL.Connection;
@@ -26,7 +26,7 @@ use Runtime.ORM.MySQL.Cursor;
 use Runtime.ORM.MySQL.Settings;
 
 
-class Driver extends CoreDriver implements DriverInterface
+class Driver extends BaseDriver implements DriverInterface
 {
 	protected Map<Connection> connections;
 	
