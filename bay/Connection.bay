@@ -23,6 +23,7 @@ use Runtime.DateTime;
 use Runtime.RuntimeUtils;
 use Runtime.ORM.ConnectionInterface;
 use Runtime.ORM.QueryBuilder;
+use Runtime.ORM.Annotations.CoreType;
 use Runtime.ORM.MySQL.Cursor;
 use Runtime.ORM.MySQL.Settings;
 
@@ -99,7 +100,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Process item from database
 	 */
-	async var fromDatabase(string type, var item)
+	async var fromDatabase(string type, var item, CoreType core_type)
 	{
 		if (type == "json")
 		{
@@ -128,7 +129,6 @@ class Connection implements ConnectionInterface
 				"h": rs::substr(item, 11, 2),
 				"i": rs::substr(item, 14, 2),
 				"s": rs::substr(item, 17, 2),
-				"tz": "UTC",
 			}
 		}
 		else if (type == "bool")
@@ -143,7 +143,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Process item to database
 	 */
-	async var toDatabase(string type, var item)
+	async var toDatabase(string type, var item, CoreType core_type)
 	{
 		if (type == "json")
 		{
@@ -155,7 +155,7 @@ class Connection implements ConnectionInterface
 		{
 			if (item instanceof Date)
 			{
-				return item.getDate();
+				return item.normalize().getDate();
 			}
 			return null;
 		}
@@ -163,7 +163,7 @@ class Connection implements ConnectionInterface
 		{
 			if (item instanceof DateTime)
 			{
-				return item.getDateTime("UTC");
+				return item.normalize().getDateTime("UTC");
 			}
 			return null;
 		}
@@ -209,7 +209,7 @@ class Connection implements ConnectionInterface
 		if (db_settings != null and db_settings.has("log")) log_query = db_settings["log"] |> default bool false;
 		
 		/* Add prefix */
-		sql = rs::replace("\${prefix}", this.settings.prefix, sql);
+		sql = rs::replace("${prefix}", this.settings.prefix, sql);
 		
 		/* Execute */
 		Cursor cursor = await this.prepare(sql);
@@ -241,7 +241,7 @@ class Connection implements ConnectionInterface
 		v_where = v_where.concat(res[0]);
 		items = items.concat(res[1]);
 		
-		string sql = "select * from \${prefix}" ~ table_name ~ " where " ~ rs::join(" and ", v_where);
+		string sql = "select * from ${prefix}" ~ table_name ~ " where " ~ rs::join(" and ", v_where);
 		if (limit >= 0) sql ~= " limit " ~ limit;
 		if (limit >= 0 and start >= 0) sql ~= " offset " ~ start;
 		
@@ -274,7 +274,7 @@ class Connection implements ConnectionInterface
 			}
 		);
 		
-		string sql = "insert into \${prefix}" ~ table_name ~
+		string sql = "insert into ${prefix}" ~ table_name ~
 			" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
 		;
 		
@@ -313,7 +313,7 @@ class Connection implements ConnectionInterface
 			}
 		);
 		
-		string sql = "update \${prefix}" ~ table_name ~ " set " ~ rs::join(", ", v_set) ~
+		string sql = "update ${prefix}" ~ table_name ~ " set " ~ rs::join(", ", v_set) ~
 			" where " ~ rs::join(" and ", v_where)
 		;
 		
@@ -371,7 +371,7 @@ class Connection implements ConnectionInterface
 		/* Find item */
 		c = await this.query
 		(
-			"select * from `\${prefix}" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
+			"select * from `${prefix}" ~ table_name ~ "` where " ~ rs::join(" and ", where_data) ~ " limit 1",
 			ins_items,
 			db_settings
 		)
@@ -441,7 +441,7 @@ class Connection implements ConnectionInterface
 			}
 		);
 		
-		string sql = "insert into \${prefix}" ~ table_name ~
+		string sql = "insert into ${prefix}" ~ table_name ~
 			" (" ~ rs::join(", ", ins_keys) ~ ")" ~
 			" values (" ~ rs::join(", ", ins_values) ~ ")" ~
 			(
@@ -472,7 +472,7 @@ class Connection implements ConnectionInterface
 		v_where = v_where.concat(res[0]);
 		items = items.concat(res[1]);
 		
-		string sql = "delete from \${prefix}" ~ table_name ~ " where " ~ rs::join(" and ", v_where);
+		string sql = "delete from ${prefix}" ~ table_name ~ " where " ~ rs::join(" and ", v_where);
 		Cursor cursor = await this.query(sql, items, db_settings);
 		cursor.setKind("delete");
 		return cursor;
@@ -481,12 +481,10 @@ class Connection implements ConnectionInterface
 	
 	
 	/**
-	 * Execute query
+	 * Returns query builder sql
 	 */
-	async Cursor execute(QueryBuilder q, Dict db_settings = null)
+	string getQueryBuilderSQL(QueryBuilder q)
 	{
-		if (db_settings == null) db_settings = {};
-		
 		/* Select query */
 		if (q._kind == QueryBuilder::QUERY_SELECT)
 		{
@@ -504,7 +502,7 @@ class Connection implements ConnectionInterface
 			
 			/* Add table name */
 			string table_name = q._table_name;
-			sql ~= " FROM \${prefix}" ~ table_name;
+			sql ~= " FROM ${prefix}" ~ table_name;
 			
 			/* Add table alias */
 			if (q._table_name_alias != "") sql ~= " AS " ~ q._table_name_alias;
@@ -526,7 +524,7 @@ class Connection implements ConnectionInterface
 					if (kind == "left") sql ~= " LEFT JOIN ";
 					else sql ~= " INNER JOIN ";
 					
-					sql ~= "\${prefix}" ~ table_name;
+					sql ~= "${prefix}" ~ table_name;
 					if (alias_name != "") sql ~= " AS " ~ alias_name;
 					sql ~= " ON (" ~ where ~ ")";
 					
@@ -568,17 +566,46 @@ class Connection implements ConnectionInterface
 			if (q._limit >= 0) sql ~= " LIMIT " ~ q._limit;
 			if (q._limit >= 0 and q._start >= 0) sql ~= " OFFSET " ~ q._start;
 			
-			/* Set debug log */
-			if (q._log) db_settings <= log <= true;
-			
-			Cursor cursor = await this.query(sql, params.toDict(), db_settings);
-			return cursor;
+			return [sql, params.toDict()];
 		}
 		
 		else if (q._kind == QueryBuilder::RAW_QUERY)
 		{
-			Cursor cursor = await this.query(q._sql, q._params.toDict(), db_settings);
-			return cursor;
+			return [q._sql, q._params];
+		}
+		
+		return null;
+	}
+	
+	
+	
+	/**
+	 * Execute query
+	 */
+	async Cursor executeQueryBuilder(QueryBuilder q, Dict db_settings = null)
+	{
+		if (db_settings == null) db_settings = {};
+		
+		list res = this.getQueryBuilderSQL(q);
+		if (res != null)
+		{
+			string sql = res[0];
+			Dict params = res[1];
+			
+			/* Set debug log */
+			if (q._log) db_settings <= log <= true;
+			
+			/* Select query */
+			if (q._kind == QueryBuilder::QUERY_SELECT)
+			{
+				Cursor cursor = await this.query(sql, params, db_settings);
+				return cursor;
+			}
+			else if (q._kind == QueryBuilder::RAW_QUERY)
+			{
+				Cursor cursor = await this.query(sql, params, db_settings);
+				return cursor;
+			}
 		}
 		
 		return null;
