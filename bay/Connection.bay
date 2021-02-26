@@ -1,7 +1,7 @@
 /*!
  *  Bayrell Runtime Library
  *
- *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *  (c) Copyright 2016-2021 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -572,6 +572,12 @@ class Connection implements ConnectionInterface
 			if (q._log) db_settings <= log <= true;
 			
 			Cursor cursor = await this.query(sql, params.toDict(), db_settings);
+			return cursor;
+		}
+		
+		else if (q._kind == QueryBuilder::RAW_QUERY)
+		{
+			Cursor cursor = await this.query(q._sql, q._params.toDict(), db_settings);
 			return cursor;
 		}
 		
