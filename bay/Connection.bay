@@ -22,7 +22,8 @@ use Runtime.Date;
 use Runtime.DateTime;
 use Runtime.RuntimeUtils;
 use Runtime.ORM.ConnectionInterface;
-use Runtime.ORM.QueryBuilder;
+use Runtime.ORM.Query;
+use Runtime.ORM.QueryFilter;
 use Runtime.ORM.Annotations.CoreType;
 use Runtime.ORM.MySQL.Cursor;
 use Runtime.ORM.MySQL.Settings;
@@ -483,10 +484,10 @@ class Connection implements ConnectionInterface
 	/**
 	 * Returns query builder sql
 	 */
-	string getQueryBuilderSQL(QueryBuilder q)
+	string getQuerySQL(Query q)
 	{
 		/* Select query */
-		if (q._kind == QueryBuilder::QUERY_SELECT)
+		if (q._kind == Query::QUERY_SELECT)
 		{
 			string sql = "SELECT ";
 			Map params = new Map();
@@ -569,7 +570,7 @@ class Connection implements ConnectionInterface
 			return [sql, params.toDict()];
 		}
 		
-		else if (q._kind == QueryBuilder::RAW_QUERY)
+		else if (q._kind == Query::RAW_QUERY)
 		{
 			return [q._sql, q._params];
 		}
@@ -582,11 +583,11 @@ class Connection implements ConnectionInterface
 	/**
 	 * Execute query
 	 */
-	async Cursor executeQueryBuilder(QueryBuilder q, Dict db_settings = null)
+	async Cursor executeQuery(Query q, Dict db_settings = null)
 	{
 		if (db_settings == null) db_settings = {};
 		
-		list res = this.getQueryBuilderSQL(q);
+		list res = this.getQuerySQL(q);
 		if (res != null)
 		{
 			string sql = res[0];
@@ -596,12 +597,12 @@ class Connection implements ConnectionInterface
 			if (q._log) db_settings <= log <= true;
 			
 			/* Select query */
-			if (q._kind == QueryBuilder::QUERY_SELECT)
+			if (q._kind == Query::QUERY_SELECT)
 			{
 				Cursor cursor = await this.query(sql, params, db_settings);
 				return cursor;
 			}
-			else if (q._kind == QueryBuilder::RAW_QUERY)
+			else if (q._kind == Query::RAW_QUERY)
 			{
 				Cursor cursor = await this.query(sql, params, db_settings);
 				return cursor;
@@ -616,16 +617,17 @@ class Connection implements ConnectionInterface
 	/**
 	 * Convert filter
 	 */
-	list<Collection, Dict> convertFilter(Collection<list> filter, int field_index = 0)
+	list<Collection, Dict> convertFilter(Collection<QueryFilter> filter, int field_index = 0)
 	{
 		Map items = new Map();
 		Vector where = new Vector();
 		for (int i=0; i<filter.count(); i++)
 		{
-			Collection item = filter[i];
-			string field_name = item[0] |> default string "";
-			string op = item[1] |> default string "=";
-			string value = item[2];
+			QueryFilter item = filter[i];
+			string field_name = item.field_name |> default string "";
+			string op = item.op |> default string "=";
+			string value = item.value;
+			
 			if (rtl::isEmpty(field_name) and rtl::isEmpty(op))
 			{
 				continue;

@@ -20,13 +20,13 @@ namespace Runtime.ORM.MySQL;
 
 use Runtime.BaseDriver;
 use Runtime.ORM.Exceptions.OrmException;
-use Runtime.ORM.DriverInterface;
+use Runtime.ORM.Driver as ORMDriver;
 use Runtime.ORM.MySQL.Connection;
 use Runtime.ORM.MySQL.Cursor;
 use Runtime.ORM.MySQL.Settings;
 
 
-class Driver extends BaseDriver implements DriverInterface
+class Driver extends ORMDriver
 {
 	protected Map<Connection> connections;
 	
@@ -47,6 +47,7 @@ class Driver extends BaseDriver implements DriverInterface
 	 */
 	public async void startDriver()
 	{
+		await this.buildStruct();
 	}
 	
 	
