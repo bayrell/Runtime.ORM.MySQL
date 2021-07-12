@@ -18,11 +18,11 @@
 
 namespace Runtime.ORM.MySQL;
 
-use Runtime.ORM.CursorInterface;
+use Runtime.ORM.Cursor;
 use Runtime.ORM.MySQL.Connection;
 
 
-class Cursor implements CursorInterface
+class CursorMySQL extends Cursor
 {
 	protected var pdo;
 	protected var conn;

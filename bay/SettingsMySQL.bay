@@ -21,7 +21,7 @@ namespace Runtime.ORM.MySQL;
 use Runtime.BaseStruct;
 
 
-struct Settings extends BaseStruct
+struct SettingsMySQL extends BaseStruct
 {
 	string host = "";
 	int port = 3306;
@@ -29,6 +29,7 @@ struct Settings extends BaseStruct
 	string password = "";
 	string db = "";
 	string prefix = "";
+	string base_prefix = "";
 	
 	
 	/**

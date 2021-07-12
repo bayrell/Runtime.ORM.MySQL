@@ -21,20 +21,20 @@ namespace Runtime.ORM.MySQL;
 use Runtime.Date;
 use Runtime.DateTime;
 use Runtime.RuntimeUtils;
-use Runtime.ORM.ConnectionInterface;
+use Runtime.ORM.Connection;
 use Runtime.ORM.Query;
 use Runtime.ORM.QueryFilter;
 use Runtime.ORM.Annotations.CoreType;
-use Runtime.ORM.MySQL.Cursor;
-use Runtime.ORM.MySQL.Settings;
+use Runtime.ORM.MySQL.CursorMySQL;
+use Runtime.ORM.MySQL.SettingsMySQL;
 
 
-class Connection implements ConnectionInterface
+class ConnectionMySQL extends Connection
 {
 	var pdo = null;
 	string last_error = "";
 	int last_code = 0;
-	Settings settings = null;
+	SettingsMySQL settings = null;
 	
 	
 	
@@ -51,9 +51,9 @@ class Connection implements ConnectionInterface
 	/**
 	 * Connect by provider
 	 */
-	async static Connection connect(Settings db_settings)
+	async static ConnectionMySQL connect(SettingsMySQL db_settings)
 	{
-		Connection conn = new Connection();
+		ConnectionMySQL conn = new ConnectionMySQL();
 		
 		#switch
 		#case ifcode PHP then
@@ -178,15 +178,15 @@ class Connection implements ConnectionInterface
 	
 	
 	/**
-	 * Prepares SQL and return Cursor for execute
+	 * Prepares SQL and return CursorMySQL for execute
 	 */
-	async Cursor prepare(string sql)
+	async CursorMySQL prepare(string sql)
 	{
 		#switch
 		#case ifcode PHP then
 		
 		$st = $this->pdo->prepare($sql, array(\PDO::ATTR_CURSOR => \PDO::CURSOR_FWDONLY));
-		return new Cursor($ctx, $this, $sql, $st);
+		return new CursorMySQL($ctx, $this, $sql, $st);
 		
 		#endswitch
 		
@@ -198,7 +198,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Execute query
 	 */
-	public async Cursor query
+	public async CursorMySQL query
 	(
 		string sql,
 		Dict params = null,
@@ -213,7 +213,7 @@ class Connection implements ConnectionInterface
 		sql = rs::replace("${prefix}", this.settings.prefix, sql);
 		
 		/* Execute */
-		Cursor cursor = await this.prepare(sql);
+		CursorMySQL cursor = await this.prepare(sql);
 		await cursor.execute(params, log_query);
 		
 		/* Return cursor */
@@ -225,7 +225,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Select query
 	 */
-	public async Cursor select
+	public async CursorMySQL select
 	(
 		string table_name,
 		Collection<list> filter = null,
@@ -246,7 +246,7 @@ class Connection implements ConnectionInterface
 		if (limit >= 0) sql ~= " limit " ~ limit;
 		if (limit >= 0 and start >= 0) sql ~= " offset " ~ start;
 		
-		Cursor cursor = await this.query(sql, items, db_settings);
+		CursorMySQL cursor = await this.query(sql, items, db_settings);
 		cursor.setKind("select");
 		return cursor;
 	}
@@ -256,7 +256,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Insert query
 	 */
-	public async Cursor insert
+	public async CursorMySQL insert
 	(
 		string table_name,
 		Dict insert,
@@ -279,7 +279,7 @@ class Connection implements ConnectionInterface
 			" (" ~ rs::join(", ", keys) ~ ") values (" ~ rs::join(", ", values) ~ ")"
 		;
 		
-		Cursor cursor = await this.query(sql, insert, db_settings);
+		CursorMySQL cursor = await this.query(sql, insert, db_settings);
 		cursor.setKind("insert");
 		return cursor;
 	}
@@ -289,7 +289,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Update query
 	 */
-	public async Cursor update
+	public async CursorMySQL update
 	(
 		string table_name,
 		Collection<list> filter,
@@ -318,7 +318,7 @@ class Connection implements ConnectionInterface
 			" where " ~ rs::join(" and ", v_where)
 		;
 		
-		Cursor cursor = await this.query(sql, items, db_settings);
+		CursorMySQL cursor = await this.query(sql, items, db_settings);
 		cursor.setKind("update");
 		return cursor;
 	}
@@ -336,7 +336,7 @@ class Connection implements ConnectionInterface
 		Dict db_settings = null
 	)
 	{
-		Cursor c = null;
+		CursorMySQL c = null;
 		Vector ins_keys = new Vector();
 		Vector ins_values = new Vector();
 		Vector where_data = new Vector();
@@ -451,7 +451,7 @@ class Connection implements ConnectionInterface
 			)
 		;
 		
-		Cursor c = await this.query(sql, items, db_settings);
+		CursorMySQL c = await this.query(sql, items, db_settings);
 		c.close();
 	}
 	
@@ -460,7 +460,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Delete query
 	 */
-	public async Cursor delete
+	public async CursorMySQL delete
 	(
 		string table_name,
 		Collection<list> filter = null,
@@ -474,7 +474,7 @@ class Connection implements ConnectionInterface
 		items = items.concat(res[1]);
 		
 		string sql = "delete from ${prefix}" ~ table_name ~ " where " ~ rs::join(" and ", v_where);
-		Cursor cursor = await this.query(sql, items, db_settings);
+		CursorMySQL cursor = await this.query(sql, items, db_settings);
 		cursor.setKind("delete");
 		return cursor;
 	}
@@ -583,7 +583,7 @@ class Connection implements ConnectionInterface
 	/**
 	 * Execute query
 	 */
-	async Cursor executeQuery(Query q, Dict db_settings = null)
+	async CursorMySQL executeQuery(Query q, Dict db_settings = null)
 	{
 		if (db_settings == null) db_settings = {};
 		
@@ -599,12 +599,12 @@ class Connection implements ConnectionInterface
 			/* Select query */
 			if (q._kind == Query::QUERY_SELECT)
 			{
-				Cursor cursor = await this.query(sql, params, db_settings);
+				CursorMySQL cursor = await this.query(sql, params, db_settings);
 				return cursor;
 			}
 			else if (q._kind == Query::RAW_QUERY)
 			{
-				Cursor cursor = await this.query(sql, params, db_settings);
+				CursorMySQL cursor = await this.query(sql, params, db_settings);
 				return cursor;
 			}
 		}
